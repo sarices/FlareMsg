@@ -44,6 +44,7 @@ wrangler kv:namespace create WECHAT_KV
 #### 3.2 配置环境变量
 
 编辑 `src/wrangler.toml`，填入：
+
 - `WECHAT_TEMPLATE_ID`: 你的微信模版 ID
 - 其他可选配置（默认消息内容、颜色等）
 
@@ -86,11 +87,13 @@ npm run deploy
 **Endpoint**: `POST /`
 
 **Headers**:
+
 ```
 Content-Type: application/json
 ```
 
 **Body**:
+
 ```json
 {
   "token": "your_auth_token",
@@ -103,6 +106,7 @@ Content-Type: application/json
 ```
 
 **参数说明**:
+
 - `token` (必填): API 鉴权密钥，需与 `CLIENT_AUTH_TOKEN` 一致
 - `openid` (必填): 微信用户的 OpenID
 - `from` (可选): 消息来源/标题
@@ -113,6 +117,7 @@ Content-Type: application/json
 ### 响应格式
 
 **成功**:
+
 ```json
 {
   "errcode": 0,
@@ -122,6 +127,7 @@ Content-Type: application/json
 ```
 
 **失败**:
+
 ```json
 {
   "errcode": -1,
@@ -132,6 +138,7 @@ Content-Type: application/json
 ### 使用示例
 
 #### cURL
+
 ```bash
 curl -X POST https://your-worker.workers.dev \
   -H "Content-Type: application/json" \
@@ -146,6 +153,7 @@ curl -X POST https://your-worker.workers.dev \
 ```
 
 #### Python
+
 ```python
 import requests
 
@@ -164,20 +172,21 @@ print(response.json())
 ```
 
 #### Node.js
+
 ```javascript
-const response = await fetch('https://your-worker.workers.dev', {
-  method: 'POST',
+const response = await fetch("https://your-worker.workers.dev", {
+  method: "POST",
   headers: {
-    'Content-Type': 'application/json'
+    "Content-Type": "application/json",
   },
   body: JSON.stringify({
-    token: 'your_auth_token',
-    openid: 'oABCD1234567890',
-    from: '监控系统',
-    desc: '服务器 CPU 使用率过高',
-    remark: '当前使用率: 95%',
-    url: 'https://monitor.example.com'
-  })
+    token: "your_auth_token",
+    openid: "oABCD1234567890",
+    from: "监控系统",
+    desc: "服务器 CPU 使用率过高",
+    remark: "当前使用率: 95%",
+    url: "https://monitor.example.com",
+  }),
 });
 
 const result = await response.json();
@@ -195,26 +204,27 @@ HTTP 请求参数 > 环境变量默认值 > 代码内置默认值
 ```
 
 例如，`from` 字段的取值逻辑：
+
 1. 如果请求中提供了 `from`，使用请求值
 2. 否则使用 `wrangler.toml` 中的 `DEFAULT_FROM`
 3. 否则使用代码默认值 `"系统通知"`
 
 ### 环境变量列表
 
-| 变量名 | 类型 | 必填 | 说明 |
-|--------|------|------|------|
-| `WECHAT_APP_ID` | Secret | 是 | 微信公众号 AppID |
-| `WECHAT_APP_SECRET` | Secret | 是 | 微信公众号 AppSecret |
-| `WECHAT_TEMPLATE_ID` | Var | 是 | 微信消息模版 ID |
-| `CLIENT_AUTH_TOKEN` | Secret | 是 | API 调用鉴权密钥 |
-| `KV_BINDING_NAME` | Var | 否 | KV Namespace 的 binding 名称（默认: "WECHAT_KV"） |
-| `DEFAULT_FROM` | Var | 否 | 默认来源标题 |
-| `DEFAULT_DESC` | Var | 否 | 默认消息内容 |
-| `DEFAULT_REMARK` | Var | 否 | 默认备注 |
-| `DEFAULT_URL` | Var | 否 | 默认跳转链接 |
-| `COLOR_FROM` | Var | 否 | 标题颜色（十六进制） |
-| `COLOR_DESC` | Var | 否 | 内容颜色（十六进制） |
-| `COLOR_REMARK` | Var | 否 | 备注颜色（十六进制） |
+| 变量名               | 类型   | 必填 | 说明                                              |
+| -------------------- | ------ | ---- | ------------------------------------------------- |
+| `WECHAT_APP_ID`      | Secret | 是   | 微信公众号 AppID                                  |
+| `WECHAT_APP_SECRET`  | Secret | 是   | 微信公众号 AppSecret                              |
+| `WECHAT_TEMPLATE_ID` | Var    | 是   | 微信消息模版 ID                                   |
+| `CLIENT_AUTH_TOKEN`  | Secret | 是   | API 调用鉴权密钥                                  |
+| `KV_BINDING_NAME`    | Var    | 否   | KV Namespace 的 binding 名称（默认: "WECHAT_KV"） |
+| `DEFAULT_FROM`       | Var    | 否   | 默认来源标题                                      |
+| `DEFAULT_DESC`       | Var    | 否   | 默认消息内容                                      |
+| `DEFAULT_REMARK`     | Var    | 否   | 默认备注                                          |
+| `DEFAULT_URL`        | Var    | 否   | 默认跳转链接                                      |
+| `COLOR_FROM`         | Var    | 否   | 标题颜色（十六进制）                              |
+| `COLOR_DESC`         | Var    | 否   | 内容颜色（十六进制）                              |
+| `COLOR_REMARK`       | Var    | 否   | 备注颜色（十六进制）                              |
 
 ## 技术架构
 
@@ -241,17 +251,21 @@ HTTP 请求参数 > 环境变量默认值 > 代码内置默认值
 ### 常见错误
 
 **401 Unauthorized**
+
 - 检查 `CLIENT_AUTH_TOKEN` 是否正确设置
 - 确认请求中的 `token` 参数与环境变量一致
 
 **400 Missing required parameter: openid**
+
 - 确保请求中包含 `openid` 字段
 
 **Token 获取失败**
+
 - 检查 `WECHAT_APP_ID` 和 `WECHAT_APP_SECRET` 是否正确
 - 确认微信公众号状态正常
 
 **消息发送失败 (errcode: 40001)**
+
 - 系统会自动重试一次
 - 如果持续失败，检查微信公众号配置
 
@@ -261,13 +275,6 @@ HTTP 请求参数 > 环境变量默认值 > 代码内置默认值
 cd src
 wrangler tail
 ```
-
-## 项目文档
-
-- `docs/需求文档.md`: 完整功能需求
-- `docs/设计文档.md`: 系统架构设计
-- `docs/实现计划.md`: 开发任务清单
-- `CLAUDE.md`: AI 开发指南
 
 ## 许可证
 
