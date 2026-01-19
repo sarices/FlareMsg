@@ -1,0 +1,42 @@
+name = "flaremsg"
+main = "index.ts"
+compatibility_date = "2024-01-01"
+
+# KV Namespace 配置
+# 使用 wrangler kv:namespace create WECHAT_KV 创建后，将返回的 id 填入下方
+# 注意：binding 名称可以自定义，避免与现有项目冲突
+[[kv_namespaces]]
+binding = "WECHAT_KV"  # 可以改为其他名称，如 "MY_KV", "FLAREMSG_KV" 等
+id = "YOUR_KV_NAMESPACE_ID"  # 需要替换为实际的 KV Namespace ID
+
+# 环境变量配置
+[vars]
+# 必填：微信消息模版 ID
+WECHAT_TEMPLATE_ID = "YOUR_TEMPLATE_ID"  # 需要替换为实际的模版 ID
+
+# 可选：KV Namespace 的 binding 名称
+# 如果你在上面修改了 binding 名称（不是 "WECHAT_KV"），需要在这里指定
+# KV_BINDING_NAME = "MY_KV"  # 取消注释并设置为你的 binding 名称
+
+# 可选：默认消息内容
+DEFAULT_FROM = "系统通知"
+DEFAULT_DESC = "无内容"
+DEFAULT_REMARK = ""
+
+# 可选：默认跳转链接
+DEFAULT_URL = ""
+
+# 可选：字段颜色配置（十六进制）
+COLOR_FROM = "#173177"
+COLOR_DESC = "#000000"
+COLOR_REMARK = "#888888"
+
+# 注意：以下敏感信息必须通过 wrangler secret put 命令设置，不要直接写在此文件中
+# - WECHAT_APP_ID: 微信公众号 AppID
+# - WECHAT_APP_SECRET: 微信公众号 AppSecret
+# - CLIENT_AUTH_TOKEN: API 调用鉴权密钥
+#
+# 设置方法：
+# wrangler secret put WECHAT_APP_ID
+# wrangler secret put WECHAT_APP_SECRET
+# wrangler secret put CLIENT_AUTH_TOKEN

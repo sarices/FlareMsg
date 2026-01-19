@@ -1,0 +1,9 @@
+# 本地开发环境变量示例
+# 复制此文件为 .dev.vars 并填入真实值
+
+# 微信公众号配置
+WECHAT_APP_ID=你的微信AppID
+WECHAT_APP_SECRET=你的微信AppSecret
+
+# API 鉴权密钥
+CLIENT_AUTH_TOKEN=你的自定义鉴权密钥
