@@ -281,6 +281,7 @@ wrangler tail
 以下是本项目的详细文档：
 
 - **[README.md](README.md)** - 项目主文档，包含完整的使用说明
+- **[CONFIG.md](CONFIG.md)** - 配置说明，本地开发和 CI/CD 配置指南
 - **[QUICK_START.md](QUICK_START.md)** - 快速开始指南，5分钟快速测试步骤
 - **[LOCAL_TESTING.md](LOCAL_TESTING.md)** - 详细的本地测试指南
 - **[GITHUB_DEPLOYMENT.md](GITHUB_DEPLOYMENT.md)** - GitHub 自动部署配置指南
