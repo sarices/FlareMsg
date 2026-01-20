@@ -4,14 +4,11 @@ compatibility_date = "2024-01-01"
 
 # KV Namespace 配置
 # 生产环境 ID 将由 GitHub Actions 自动替换
-# 本地开发使用 preview_id
 [[kv_namespaces]]
 binding = "WECHAT_KV"
 
 # 环境变量配置
 [vars]
-# 微信消息模版 ID
-WECHAT_TEMPLATE_ID = "INB76kVEsOPrD7d6VmfPT_OlO0mT3ocodUH-vvEs328"
 
 # 默认消息内容
 DEFAULT_FROM = "系统通知"
