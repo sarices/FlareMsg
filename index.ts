@@ -1555,7 +1555,11 @@ const ADMIN_HTML = `<!DOCTYPE html>
             </div>
 
             <div class="token-list">
-                <h2>用户 Token 列表</h2>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                    <h2 style="margin: 0;">用户 Token 列表</h2>
+                    <button onclick="loadTokens()" style="padding: 8px 16px; font-size: 14px; background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: 6px; cursor: pointer; color: var(--text-primary);">🔄 刷新</button>
+                </div>
+                <div id="tokenStats" style="color: var(--text-secondary); font-size: 13px; margin-bottom: 10px;"></div>
                 <div id="tokenList"></div>
             </div>
         </div>
@@ -1616,21 +1620,39 @@ const ADMIN_HTML = `<!DOCTYPE html>
         }
 
         async function loadTokens() {
+            const container = document.getElementById('tokenList');
+            const stats = document.getElementById('tokenStats');
+
+            // 显示加载状态
+            container.innerHTML = '<div class="empty-state">⏳ 正在加载...</div>';
+            stats.textContent = '';
+
             try {
+                console.log('[DEBUG] Fetching tokens from /admin/api/tokens');
                 const response = await fetch('/admin/api/tokens', {
                     headers: {
                         'Authorization': 'Bearer ' + authToken
                     }
                 });
 
+                console.log('[DEBUG] Response status:', response.status);
+                console.log('[DEBUG] Response ok:', response.ok);
+
                 if (response.ok) {
                     const data = await response.json();
+                    console.log('[DEBUG] Response data:', data);
                     displayTokens(data.tokens);
+                    stats.textContent = `共找到 ${data.tokens.length} 个 Token`;
                 } else {
-                    showAlert('加载 Token 列表失败', 'error');
+                    const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+                    console.error('[ERROR] Failed to load tokens:', errorData);
+                    showAlert('加载 Token 列表失败: ' + (errorData.error || '未知错误'), 'error');
+                    container.innerHTML = '<div class="empty-state">❌ 加载失败</div>';
                 }
             } catch (error) {
+                console.error('[ERROR] Network error:', error);
                 showAlert('网络错误: ' + error.message, 'error');
+                container.innerHTML = '<div class="empty-state">❌ 网络错误</div>';
             }
         }
 
@@ -2068,22 +2090,44 @@ async function handleAdminAPI(request: Request, env: Env, url: URL): Promise<Res
     // GET /admin/api/tokens - 列出所有 sk_ 开头的 token
     if (path === '/admin/api/tokens' && request.method === 'GET') {
       const tokens: { key: string; value: string }[] = [];
+      let cursor: string | undefined = undefined;
 
-      // 列出 KV 中的所有 keys
-      const listResult = await kv.list();
-      for (const key of listResult.keys) {
-        if (key.name.startsWith('sk_')) {
-          const value = await kv.get(key.name);
-          if (value) {
-            tokens.push({ key: key.name, value });
+      try {
+        // 使用循环处理分页，确保获取所有 keys
+        do {
+          const listResult = await kv.list({ cursor });
+          console.log(`[DEBUG] KV list result: keys=${listResult.keys.length}, list_complete=${listResult.list_complete}, cursor=${listResult.cursor ? 'exists' : 'none'}`);
+
+          for (const key of listResult.keys) {
+            if (key.name.startsWith('sk_')) {
+              const value = await kv.get(key.name);
+              if (value) {
+                tokens.push({ key: key.name, value });
+                console.log(`[DEBUG] Found token: ${key.name} -> ${value}`);
+              }
+            }
           }
-        }
-      }
 
-      return new Response(JSON.stringify({ tokens }), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' }
-      });
+          // 如果还有更多数据，继续获取
+          cursor = listResult.list_complete ? undefined : listResult.cursor;
+        } while (cursor);
+
+        console.log(`[DEBUG] Total tokens found: ${tokens.length}`);
+
+        return new Response(JSON.stringify({ tokens }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      } catch (error) {
+        console.error('[ERROR] Failed to list tokens:', error);
+        return new Response(JSON.stringify({
+          error: 'Failed to list tokens',
+          details: error instanceof Error ? error.message : String(error)
+        }), {
+          status: 500,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
     }
 
     // POST /admin/api/tokens - 添加新的用户 token
