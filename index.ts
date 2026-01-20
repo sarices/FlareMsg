@@ -12,8 +12,8 @@
  */
 
 // 导入 HTML 模板
-import { INDEX_HTML } from './html/index.html';
-import { ADMIN_HTML } from './html/admin.html';
+import { INDEX_HTML } from './html/index_html';
+import { ADMIN_HTML } from './html/admin_html';
 
 // 环境变量类型定义
 interface Env {

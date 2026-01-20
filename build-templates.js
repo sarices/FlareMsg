@@ -21,8 +21,8 @@ htmlFiles.forEach(file => {
   const htmlPath = path.join(templatesDir, file);
   const htmlContent = fs.readFileSync(htmlPath, 'utf-8');
 
-  // 生成 TypeScript 文件名
-  const tsFileName = file.replace('.html', '.html.ts');
+  // 生成 TypeScript 文件名（使用 _html.ts 后缀，避免 Cloudflare Workers 打包工具混淆）
+  const tsFileName = file.replace('.html', '_html.ts');
   const tsPath = path.join(outputDir, tsFileName);
 
   // 生成 TypeScript 内容
