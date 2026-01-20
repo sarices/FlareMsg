@@ -4,22 +4,18 @@ compatibility_date = "2024-01-01"
 
 # KV Namespace 配置
 # 使用 wrangler kv:namespace create WECHAT_KV 创建后，将返回的 id 填入下方
-# 注意：binding 名称可以自定义，避免与现有项目冲突
 [[kv_namespaces]]
 binding = "WECHAT_KV"
-# KV Namespace ID 需要替换为实际值
-# 获取方法: wrangler kv:namespace create WECHAT_KV
-id = "YOUR_KV_NAMESPACE_ID"  # 请替换为实际的 KV Namespace ID
+id = "YOUR_KV_NAMESPACE_ID"  # 替换为实际的 KV Namespace ID
 
 # 环境变量配置
 [vars]
 # 必填：微信消息模版 ID
-# 优先使用环境变量 WECHAT_TEMPLATE_ID，如未设置则使用下面的默认值
-WECHAT_TEMPLATE_ID = "INB76kVEsOPrD7d6VmfPT_OlO0mT3ocodUH-vvEs328"  # 请替换为实际的模版 ID
+WECHAT_TEMPLATE_ID = "YOUR_TEMPLATE_ID"  # 替换为实际的模版 ID
 
 # 可选：KV Namespace 的 binding 名称
 # 如果你在上面修改了 binding 名称（不是 "WECHAT_KV"），需要在这里指定
-# KV_BINDING_NAME = "MY_KV"  # 取消注释并设置为你的 binding 名称
+# KV_BINDING_NAME = "MY_KV"
 
 # 可选：默认消息内容
 DEFAULT_FROM = "系统通知"
