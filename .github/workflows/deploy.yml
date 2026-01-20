@@ -20,24 +20,29 @@ jobs:
       with:
         node-version: '20'
         cache: 'npm'
+        cache-dependency-path: src/package-lock.json
 
     - name: Install dependencies
+      working-directory: ./src
       run: npm ci
 
     - name: TypeScript type checking
+      working-directory: ./src
       run: npm run type-check
 
     - name: Configure wrangler.toml
+      working-directory: ./src
       run: |
-        # 从 GitHub Secrets 替换配置值
+        # 从 GitHub Secrets 替换生产环境 KV Namespace ID
         sed -i "s|YOUR_KV_NAMESPACE_ID|${{ secrets.KV_NAMESPACE_ID }}|g" wrangler.toml
-        sed -i "s|YOUR_TEMPLATE_ID|${{ secrets.WECHAT_TEMPLATE_ID }}|g" wrangler.toml
-      env:
-        KV_NAMESPACE_ID: ${{ secrets.KV_NAMESPACE_ID }}
-        WECHAT_TEMPLATE_ID: ${{ secrets.WECHAT_TEMPLATE_ID }}
+        echo "✅ Configured KV Namespace ID"
 
     - name: Deploy to Cloudflare Workers
+      working-directory: ./src
       run: npx wrangler deploy
       env:
         CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        WECHAT_APP_ID: ${{ secrets.WECHAT_APP_ID }}
+        WECHAT_APP_SECRET: ${{ secrets.WECHAT_APP_SECRET }}
+        CLIENT_AUTH_TOKEN: ${{ secrets.CLIENT_AUTH_TOKEN }}

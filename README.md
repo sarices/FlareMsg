@@ -7,9 +7,12 @@
 - ✅ 无服务器架构，部署在 Cloudflare 边缘网络
 - ✅ 自动管理微信 Access Token（KV 缓存 + 自动刷新）
 - ✅ Token 失效自动重试机制
+- ✅ 支持 GET 和 POST 双重请求方式
+- ✅ 支持用户级 Token（sk_ 前缀，无需提供 openid）
+- ✅ Web 管理界面，可视化管理用户 Token
 - ✅ 支持参数优先级配置（请求参数 > 环境变量 > 默认值）
 - ✅ 支持自定义消息内容和跳转链接
-- ✅ 完整的鉴权机制
+- ✅ 完整的鉴权机制（全局 Token + 用户 Token）
 
 ## 快速开始
 
@@ -82,9 +85,51 @@ npm run deploy
 
 ## API 使用
 
+### 鉴权机制
+
+FlareMsg 支持两种 Token 鉴权方式：
+
+#### 1. 全局 Token（原有方式）
+- 使用 `CLIENT_AUTH_TOKEN` 环境变量配置的密钥
+- 需要同时提供 `openid` 参数
+- 适合管理员或系统级别的消息发送
+
+#### 2. 用户 Token（推荐）
+- 格式：`sk_` 开头的随机字符串（如 `sk_abc123xyz`）
+- 存储在 KV 中，Key 为 token，Value 为对应的 openid
+- **无需提供 openid 参数**，系统自动从 KV 获取
+- 适合为单个用户或应用分配独立的推送密钥
+
 ### 请求格式
 
-**Endpoint**: `POST /`
+#### 方式一：GET 请求
+
+**Endpoint**: `GET /send`
+
+**Query 参数**:
+
+```
+token=your_auth_token
+&openid=user_openid (可选，使用用户 Token 时不需要)
+&from=消息来源
+&desc=消息内容
+&remark=备注
+&url=跳转链接
+```
+
+**示例**:
+
+```bash
+# 使用全局 Token
+curl "https://your-worker.workers.dev/send?token=YOUR_TOKEN&openid=USER_OPENID&desc=测试消息"
+
+# 使用用户 Token（无需 openid）
+curl "https://your-worker.workers.dev/send?token=sk_abc123&desc=测试消息"
+```
+
+#### 方式二：POST 请求
+
+**Endpoint**: `POST /send`
 
 **Headers**:
 
@@ -107,8 +152,12 @@ Content-Type: application/json
 
 **参数说明**:
 
-- `token` (必填): API 鉴权密钥，需与 `CLIENT_AUTH_TOKEN` 一致
-- `openid` (必填): 微信用户的 OpenID
+- `token` (必填): API 鉴权密钥
+  - 全局 Token：需与 `CLIENT_AUTH_TOKEN` 一致
+  - 用户 Token：`sk_` 开头的字符串，自动关联 openid
+- `openid` (条件必填): 微信用户的 OpenID
+  - 使用全局 Token 时必填
+  - 使用用户 Token（`sk_` 开头）时不需要
 - `from` (可选): 消息来源/标题
 - `desc` (可选): 消息主要内容
 - `remark` (可选): 备注信息
@@ -140,16 +189,29 @@ Content-Type: application/json
 #### cURL
 
 ```bash
-curl -X POST https://your-worker.workers.dev \
+# 使用全局 Token（需要 openid）
+curl -X POST https://your-worker.workers.dev/send \
   -H "Content-Type: application/json" \
   -d '{
-    "token": "your_auth_token",
+    "token": "your_client_auth_token",
     "openid": "oABCD1234567890",
     "from": "监控系统",
     "desc": "服务器 CPU 使用率过高",
     "remark": "当前使用率: 95%",
     "url": "https://monitor.example.com"
   }'
+
+# 使用用户 Token（无需 openid）
+curl -X POST https://your-worker.workers.dev/send \
+  -H "Content-Type: application/json" \
+  -d '{
+    "token": "sk_abc123xyz",
+    "from": "监控系统",
+    "desc": "服务器 CPU 使用率过高"
+  }'
+
+# GET 请求方式
+curl "https://your-worker.workers.dev/send?token=sk_abc123xyz&desc=测试消息&from=API调用"
 ```
 
 #### Python
@@ -157,10 +219,10 @@ curl -X POST https://your-worker.workers.dev \
 ```python
 import requests
 
-url = "https://your-worker.workers.dev"
+# 使用用户 Token（推荐）
+url = "https://your-worker.workers.dev/send"
 payload = {
-    "token": "your_auth_token",
-    "openid": "oABCD1234567890",
+    "token": "sk_abc123xyz",
     "from": "监控系统",
     "desc": "服务器 CPU 使用率过高",
     "remark": "当前使用率: 95%",
@@ -174,14 +236,14 @@ print(response.json())
 #### Node.js
 
 ```javascript
-const response = await fetch("https://your-worker.workers.dev", {
+// 使用用户 Token（推荐）
+const response = await fetch("https://your-worker.workers.dev/send", {
   method: "POST",
   headers: {
     "Content-Type": "application/json",
   },
   body: JSON.stringify({
-    token: "your_auth_token",
-    openid: "oABCD1234567890",
+    token: "sk_abc123xyz",
     from: "监控系统",
     desc: "服务器 CPU 使用率过高",
     remark: "当前使用率: 95%",
@@ -192,6 +254,120 @@ const response = await fetch("https://your-worker.workers.dev", {
 const result = await response.json();
 console.log(result);
 ```
+
+#### JavaScript / Browser
+
+```javascript
+// 使用 GET 请求和用户 Token
+const url = new URL('https://your-worker.workers.dev/send');
+url.searchParams.set('token', 'sk_abc123xyz');
+url.searchParams.set('desc', '测试消息');
+url.searchParams.set('from', 'Web应用');
+
+fetch(url)
+  .then(res => res.json())
+  .then(data => console.log(data));
+```
+
+## 管理功能
+
+FlareMsg 提供了 Web 管理界面和 REST API，用于管理用户 Token。
+
+### Web 管理界面
+
+访问 `https://your-worker.workers.dev/admin` 即可进入管理页面。
+
+**功能特性**：
+- 🔐 安全的登录验证（需要 `CLIENT_AUTH_TOKEN`）
+- 📋 查看所有用户 Token（仅 `sk_` 开头的 Token）
+- ➕ 添加新 Token（自动生成 `sk_` 前缀的随机 Token）
+- 🗑️ 删除指定 Token
+- 📋 一键复制 Token 到剪贴板
+
+**使用步骤**：
+1. 访问 `/admin` 页面
+2. 输入管理员 Token（`CLIENT_AUTH_TOKEN`）
+3. 登录后可以：
+   - 在"添加用户 Token"区域输入用户的 OpenID
+   - 系统自动生成形如 `sk_abc123xyz` 的 Token
+   - 查看、复制或删除现有 Token
+
+### 管理 API
+
+#### 列出所有用户 Token
+
+```bash
+curl -H "Authorization: Bearer CLIENT_AUTH_TOKEN" \
+  https://your-worker.workers.dev/admin/api/tokens
+```
+
+**响应**：
+
+```json
+{
+  "tokens": [
+    {
+      "key": "sk_abc123xyz",
+      "value": "oABCD1234567890"
+    },
+    {
+      "key": "sk_def456uvw",
+      "value": "oEFGH9876543210"
+    }
+  ]
+}
+```
+
+#### 添加新用户 Token
+
+```bash
+curl -X POST https://your-worker.workers.dev/admin/api/tokens \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer CLIENT_AUTH_TOKEN" \
+  -d '{"openid": "oABCD1234567890"}'
+```
+
+**响应**：
+
+```json
+{
+  "success": true,
+  "key": "sk_abc123xyz",
+  "value": "oABCD1234567890"
+}
+```
+
+#### 删除用户 Token
+
+```bash
+curl -X DELETE "https://your-worker.workers.dev/admin/api/tokens?key=sk_abc123xyz" \
+  -H "Authorization: Bearer CLIENT_AUTH_TOKEN"
+```
+
+**响应**：
+
+```json
+{
+  "success": true,
+  "message": "Token deleted successfully"
+}
+```
+
+### 安全建议
+
+1. **保护管理员 Token**
+   - `CLIENT_AUTH_TOKEN` 应该妥善保管
+   - 不要在前端代码中暴露
+   - 定期更换
+
+2. **用户 Token 分配**
+   - 为不同的用户/应用分配独立的 Token
+   - Token 泄露时只需删除对应的 Token，不影响其他用户
+   - 定期审计 Token 使用情况
+
+3. **访问控制**
+   - 管理页面应该通过 IP 白名单或 VPN 限制访问
+   - 可以通过 Cloudflare Workers 的 Access 功能添加额外保护
 
 ## 配置说明
 

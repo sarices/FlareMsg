@@ -2,9 +2,13 @@
  * FlareMsg - Cloudflare Workers 微信消息推送服务
  *
  * 主要功能：
- * 1. 接收 HTTP POST 请求
+ * 1. 接收 HTTP GET/POST 请求
  * 2. 自动管理微信 Access Token（KV 缓存 + 自动刷新）
  * 3. 发送微信模版消息
+ *
+ * 鉴权机制：
+ * - 全局 Token：使用 CLIENT_AUTH_TOKEN 进行全局鉴权，需提供 openid 参数
+ * - 用户 Token：sk_XXX 形式的 token，存储在 KV 中，值为对应的 openid，无需提供 openid 参数
  */
 
 // 环境变量类型定义
@@ -79,14 +83,17 @@ const INDEX_HTML = `<!DOCTYPE html>
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     <style>
+        /* 暗黑主题（默认） */
         :root {
             --wechat-green: #07C160;
             --wechat-green-dark: #06AD56;
             --wechat-green-light: #1DB954;
-            --bg-dark: #0D1117;
-            --bg-card: #161B22;
+            --bg-primary: #0D1117;
+            --bg-secondary: #161B22;
+            --bg-tertiary: #21262D;
             --bg-input: #0D1117;
             --border-color: #30363D;
+            --border-hover: #8B949E;
             --text-primary: #F0F6FC;
             --text-secondary: #8B949E;
             --text-muted: #6E7681;
@@ -95,6 +102,83 @@ const INDEX_HTML = `<!DOCTYPE html>
             --warning: #D29922;
             --glow-green: rgba(7, 193, 96, 0.4);
             --glow-blue: rgba(88, 166, 255, 0.3);
+            --shadow-card: 0 32px 64px rgba(0, 0, 0, 0.4);
+            --shadow-button: 0 12px 40px var(--glow-green);
+        }
+
+        /* 浅色主题 */
+        .light-mode {
+            --bg-primary: #FFFFFF;
+            --bg-secondary: #F6F8FA;
+            --bg-tertiary: #EAECEF;
+            --bg-input: #FFFFFF;
+            --border-color: #D0D7DE;
+            --border-hover: #57606A;
+            --text-primary: #24292F;
+            --text-secondary: #57606A;
+            --text-muted: #8B949E;
+            --shadow-card: 0 2px 16px rgba(0, 0, 0, 0.08);
+            --shadow-button: 0 4px 24px rgba(7, 193, 96, 0.3);
+        }
+
+        /* 主题切换按钮 */
+        .theme-toggle {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+            z-index: 1000;
+            box-shadow: var(--shadow);
+        }
+
+        .theme-toggle:hover {
+            transform: scale(1.05);
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+        }
+
+        .theme-toggle svg {
+            width: 20px;
+            height: 20px;
+            transition: transform 0.3s ease;
+        }
+
+        .theme-toggle .sun-icon {
+            display: none;
+        }
+
+        .theme-toggle .moon-icon {
+            display: block;
+        }
+
+        .light-mode .theme-toggle .sun-icon {
+            display: block;
+        }
+
+        .light-mode .theme-toggle .moon-icon {
+            display: none;
+        }
+
+        @media (max-width: 768px) {
+            .theme-toggle {
+                top: 12px;
+                right: 12px;
+                width: 40px;
+                height: 40px;
+            }
+
+            .theme-toggle svg {
+                width: 18px;
+                height: 18px;
+            }
         }
 
         * {
@@ -104,15 +188,16 @@ const INDEX_HTML = `<!DOCTYPE html>
         }
 
         body {
-            font-family: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
-            background: var(--bg-dark);
+            font-family: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg-primary);
             min-height: 100vh;
             display: flex;
             align-items: center;
             justify-content: center;
-            padding: 24px;
+            padding: 16px;
             position: relative;
             overflow-x: hidden;
+            transition: background 0.3s ease, color 0.3s ease;
         }
 
         /* Animated background particles */
@@ -208,15 +293,28 @@ const INDEX_HTML = `<!DOCTYPE html>
 
         /* Card with glass effect */
         .card {
-            background: rgba(22, 27, 34, 0.8);
+            background: var(--bg-secondary);
             backdrop-filter: blur(20px);
             -webkit-backdrop-filter: blur(20px);
             border: 1px solid var(--border-color);
             border-radius: 24px;
             padding: 48px 40px;
-            box-shadow:
-                0 32px 64px rgba(0, 0, 0, 0.4),
-                0 0 0 1px rgba(255, 255, 255, 0.05) inset;
+            box-shadow: var(--shadow-card);
+            transition: background 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        @media (max-width: 768px) {
+            .card {
+                padding: 32px 24px;
+                border-radius: 20px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .card {
+                padding: 24px 16px;
+                border-radius: 16px;
+            }
         }
 
         /* Header */
@@ -600,10 +698,15 @@ const INDEX_HTML = `<!DOCTYPE html>
             border-color: rgba(7, 193, 96, 0.4);
         }
 
-        /* Responsive */
-        @media (max-width: 640px) {
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            body {
+                padding: 12px;
+            }
+
             .card {
                 padding: 32px 24px;
+                border-radius: 20px;
             }
 
             .header h1 {
@@ -620,14 +723,98 @@ const INDEX_HTML = `<!DOCTYPE html>
                 height: 32px;
             }
 
+            .preset-bar {
+                flex-direction: column;
+                gap: 8px;
+            }
+
+            .preset-btn {
+                width: 100%;
+                text-align: center;
+            }
+        }
+
+        @media (max-width: 480px) {
+            body {
+                padding: 8px;
+            }
+
+            .card {
+                padding: 24px 16px;
+                border-radius: 16px;
+            }
+
+            .header h1 {
+                font-size: 22px;
+            }
+
+            .header p {
+                font-size: 14px;
+            }
+
+            .btn-submit {
+                padding: 16px 20px;
+                font-size: 15px;
+            }
+
+            .form-group input,
+            .form-group textarea {
+                padding: 14px 16px;
+                font-size: 14px;
+            }
+
             .footer-links {
                 flex-direction: column;
                 gap: 12px;
+            }
+
+            .footer-links a {
+                justify-content: center;
+            }
+        }
+
+        /* 触摸优化 */
+        @media (hover: none) and (pointer: coarse) {
+            .btn-submit:hover {
+                transform: none;
+            }
+
+            .btn-submit:active {
+                transform: scale(0.98);
+            }
+
+            .preset-btn:hover {
+                background: rgba(7, 193, 96, 0.1);
+                border-color: rgba(7, 193, 96, 0.2);
+            }
+
+            .preset-btn:active {
+                background: rgba(7, 193, 96, 0.2);
+                transform: scale(0.98);
             }
         }
     </style>
 </head>
 <body>
+    <!-- Theme Toggle Button -->
+    <button class="theme-toggle" onclick="toggleTheme()" aria-label="切换主题">
+        <svg class="moon-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="4"/>
+            <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/>
+        </svg>
+        <svg class="sun-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="5"/>
+            <line x1="12" y1="1" x2="12" y2="3"/>
+            <line x1="12" y1="21" x2="12" y2="23"/>
+            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
+            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+            <line x1="1" y1="12" x2="3" y2="12"/>
+            <line x1="21" y1="12" x2="23" y2="12"/>
+            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
+            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+        </svg>
+    </button>
+
     <!-- Animated background -->
     <div class="particles">
         <div class="particle"></div>
@@ -655,6 +842,11 @@ const INDEX_HTML = `<!DOCTYPE html>
                 <h1>FlareMsg</h1>
                 <p>微信消息推送服务</p>
                 <div class="status-badge">就绪</div>
+                <div style="margin-top: 16px; font-size: 13px; color: #8b949e;">
+                    <strong>API 端点:</strong> GET/POST <code style="background: #30363d; padding: 2px 6px; border-radius: 4px; font-family: 'JetBrains Mono', monospace;">/send</code>
+                    <span style="margin: 0 8px;">|</span>
+                    <a href="/admin" style="color: #58a6ff; text-decoration: none;">管理页面 →</a>
+                </div>
             </div>
 
             <div id="alert" class="alert">
@@ -753,6 +945,13 @@ const INDEX_HTML = `<!DOCTYPE html>
                         </svg>
                         GitHub
                     </a>
+                    <a href="/admin" target="_blank">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm0 18a8 8 0 1 1 8-8 8 8 0 0 1-8 8z"/>
+                            <path d="M12 6v6l4 2"/>
+                        </svg>
+                        管理页面
+                    </a>
                     <a href="https://github.com/sarices/FlareMsg/issues" target="_blank">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <circle cx="12" cy="12" r="10"/>
@@ -778,6 +977,22 @@ const INDEX_HTML = `<!DOCTYPE html>
             alert: { from: '⚠️ 告警通知', remark: '请立即处理！' },
             info: { from: '信息推送', remark: '' }
         };
+
+        // 主题切换功能
+        function initTheme() {
+            const savedTheme = localStorage.getItem('theme');
+            if (savedTheme === 'light') {
+                document.body.classList.add('light-mode');
+            }
+        }
+
+        function toggleTheme() {
+            const isLight = document.body.classList.toggle('light-mode');
+            localStorage.setItem('theme', isLight ? 'light' : 'dark');
+        }
+
+        // 页面加载时初始化主题
+        initTheme();
 
         // Load saved credentials
         window.addEventListener('DOMContentLoaded', () => {
@@ -825,7 +1040,7 @@ const INDEX_HTML = `<!DOCTYPE html>
             localStorage.setItem('flaremsg_openid', data.openid);
 
             try {
-                const response = await fetch('/', {
+                const response = await fetch('/send', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(data)
@@ -849,10 +1064,681 @@ const INDEX_HTML = `<!DOCTYPE html>
 </body>
 </html>`;
 
+// 管理页面 HTML
+const ADMIN_HTML = `<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Token 管理 - FlareMsg</title>
+    <style>
+        /* 暗黑主题（默认） */
+        :root {
+            --bg-primary: #0D1117;
+            --bg-secondary: #161B22;
+            --bg-tertiary: #21262D;
+            --bg-input: #0D1117;
+            --border-color: #30363D;
+            --border-hover: #8B949E;
+            --text-primary: #F0F6FC;
+            --text-secondary: #8B949E;
+            --text-muted: #6E7681;
+            --primary: #07C160;
+            --primary-hover: #06AD56;
+            --danger: #DA3633;
+            --danger-hover: #F85149;
+            --success: #3FB950;
+            --error: #F85149;
+            --shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+
+        /* 浅色主题 */
+        .light-mode {
+            --bg-primary: #FFFFFF;
+            --bg-secondary: #F6F8FA;
+            --bg-tertiary: #EAECEF;
+            --bg-input: #FFFFFF;
+            --border-color: #D0D7DE;
+            --border-hover: #57606A;
+            --text-primary: #24292F;
+            --text-secondary: #57606A;
+            --text-muted: #8B949E;
+            --shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+        }
+
+        /* 主题切换按钮 */
+        .theme-toggle {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+            z-index: 1000;
+            box-shadow: var(--shadow);
+        }
+
+        .theme-toggle:hover {
+            transform: scale(1.05);
+        }
+
+        .theme-toggle svg {
+            width: 20px;
+            height: 20px;
+            transition: transform 0.3s ease;
+        }
+
+        .theme-toggle .sun-icon {
+            display: none;
+        }
+
+        .theme-toggle .moon-icon {
+            display: block;
+        }
+
+        .light-mode .theme-toggle .sun-icon {
+            display: block;
+        }
+
+        .light-mode .theme-toggle .moon-icon {
+            display: none;
+        }
+
+        @media (max-width: 768px) {
+            .theme-toggle {
+                top: 12px;
+                right: 12px;
+                width: 40px;
+                height: 40px;
+            }
+
+            .theme-toggle svg {
+                width: 18px;
+                height: 18px;
+            }
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            padding: 20px;
+            transition: background 0.3s ease, color 0.3s ease;
+        }
+
+        @media (max-width: 768px) {
+            body {
+                padding: 12px;
+            }
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid var(--border-color);
+            transition: border-color 0.3s ease;
+        }
+
+        .header h1 {
+            font-size: 28px;
+            margin-bottom: 10px;
+            transition: color 0.3s ease;
+        }
+
+        .header a {
+            color: var(--primary);
+            text-decoration: none;
+            transition: color 0.3s ease;
+        }
+
+        .header a:hover {
+            text-decoration: underline;
+        }
+
+        .auth-section {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 30px;
+            transition: background 0.3s ease, border-color 0.3s ease;
+        }
+
+        @media (max-width: 768px) {
+            .auth-section {
+                padding: 20px;
+                border-radius: 10px;
+            }
+        }
+
+        .auth-section h2 {
+            font-size: 18px;
+            margin-bottom: 16px;
+            color: var(--text-primary);
+        }
+
+        .input-group {
+            margin-bottom: 16px;
+        }
+
+        .input-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: var(--text-secondary);
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        input[type="text"],
+        input[type="password"] {
+            width: 100%;
+            padding: 12px 16px;
+            background: var(--bg-input);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-size: 15px;
+            transition: all 0.2s ease;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(7, 193, 96, 0.1);
+        }
+
+        @media (max-width: 768px) {
+            input[type="text"],
+            input[type="password"] {
+                font-size: 16px; /* 防止 iOS 自动缩放 */
+            }
+        }
+
+        button {
+            padding: 12px 24px;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 15px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+
+        button:hover {
+            background: var(--primary-hover);
+            transform: translateY(-1px);
+            box-shadow: var(--shadow);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        button:disabled {
+            background: var(--border-color);
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        @media (hover: none) {
+            button:hover {
+                transform: none;
+            }
+
+            button:active {
+                transform: scale(0.98);
+            }
+        }
+
+        button.danger {
+            background: var(--danger);
+        }
+
+        button.danger:hover {
+            background: var(--danger-hover);
+        }
+
+        .content {
+            display: none;
+        }
+
+        .content.visible {
+            display: block;
+        }
+
+        .add-token-section {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 30px;
+            transition: background 0.3s ease, border-color 0.3s ease;
+        }
+
+        @media (max-width: 768px) {
+            .add-token-section {
+                padding: 20px;
+            }
+        }
+
+        .add-token-section h2 {
+            font-size: 18px;
+            margin-bottom: 12px;
+            color: var(--text-primary);
+        }
+
+        .add-token-section p {
+            color: var(--text-secondary);
+            margin-bottom: 16px;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        .token-list {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 24px;
+            transition: background 0.3s ease, border-color 0.3s ease;
+        }
+
+        @media (max-width: 768px) {
+            .token-list {
+                padding: 20px;
+            }
+        }
+
+        .token-list h2 {
+            font-size: 18px;
+            margin-bottom: 16px;
+            color: var(--text-primary);
+        }
+
+        .token-item {
+            display: flex;
+            align-items: center;
+            padding: 16px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            margin-bottom: 12px;
+            transition: background 0.3s ease, border-color 0.3s ease;
+        }
+
+        @media (max-width: 768px) {
+            .token-item {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 12px;
+                padding: 12px;
+            }
+
+            .token-info {
+                margin-right: 0 !important;
+                width: 100% !important;
+            }
+
+            .token-actions {
+                width: 100%;
+                flex-direction: column;
+                gap: 8px;
+            }
+
+            .token-actions button {
+                width: 100%;
+            }
+        }
+
+        .token-info {
+            flex: 1;
+            margin-right: 20px;
+            min-width: 0;
+        }
+
+        .token-key {
+            font-family: 'Monaco', 'Courier New', monospace;
+            font-size: 15px;
+            margin-bottom: 6px;
+            color: var(--primary);
+            word-break: break-all;
+        }
+
+        .token-value {
+            font-size: 13px;
+            color: var(--text-secondary);
+            word-break: break-all;
+        }
+
+        .token-actions {
+            display: flex;
+            gap: 8px;
+            flex-shrink: 0;
+        }
+
+        @media (max-width: 480px) {
+            .token-actions {
+                flex-direction: column;
+                width: 100%;
+            }
+
+            .token-actions button {
+                width: 100%;
+            }
+        }
+
+        .alert {
+            padding: 14px 18px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: none;
+            animation: slideIn 0.3s ease;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .alert.show {
+            display: block;
+        }
+
+        .alert.success {
+            background: rgba(63, 185, 80, 0.1);
+            border: 1px solid rgba(63, 185, 80, 0.3);
+            color: var(--success);
+        }
+
+        .alert.error {
+            background: rgba(218, 54, 51, 0.1);
+            border: 1px solid rgba(218, 54, 51, 0.3);
+            color: var(--error);
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 48px 24px;
+            color: var(--text-secondary);
+        }
+
+        @media (max-width: 768px) {
+            .empty-state {
+                padding: 32px 16px;
+            }
+        }
+
+        /* 触摸优化 */
+        @media (hover: none) and (pointer: coarse) {
+            button {
+                min-height: 44px; /* 推荐的触摸目标最小尺寸 */
+                font-size: 16px;
+            }
+
+            button:active {
+                transform: scale(0.98);
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Theme Toggle Button -->
+    <button class="theme-toggle" onclick="toggleTheme()" aria-label="切换主题">
+        <svg class="moon-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="4"/>
+            <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/>
+        </svg>
+        <svg class="sun-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="5"/>
+            <line x1="12" y1="1" x2="12" y2="3"/>
+            <line x1="12" y1="21" x2="12" y2="23"/>
+            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
+            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+            <line x1="1" y1="12" x2="3" y2="12"/>
+            <line x1="21" y1="12" x2="23" y2="12"/>
+            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
+            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+        </svg>
+    </button>
+
+    <div class="container">
+        <div class="header">
+            <h1>🔑 Token 管理</h1>
+            <a href="/">← 返回首页</a>
+        </div>
+
+        <div id="authSection" class="auth-section">
+            <h2>身份验证</h2>
+            <div class="input-group">
+                <label for="adminToken">管理员 Token (CLIENT_AUTH_TOKEN)</label>
+                <input type="password" id="adminToken" placeholder="请输入管理员 Token">
+            </div>
+            <button onclick="login()">登录</button>
+        </div>
+
+        <div id="content" class="content">
+            <div id="alert" class="alert"></div>
+
+            <div class="add-token-section">
+                <h2>添加用户 Token</h2>
+                <p style="color: #8b949e; margin-bottom: 15px;">输入用户的 OpenID，系统将自动生成 sk_ 开头的 Token</p>
+                <div class="input-group">
+                    <label for="openid">用户 OpenID</label>
+                    <input type="text" id="openid" placeholder="例如：oxxxxxxxxxxxxxxxxxxxxxxx">
+                </div>
+                <button onclick="addToken()">添加 Token</button>
+            </div>
+
+            <div class="token-list">
+                <h2>用户 Token 列表</h2>
+                <div id="tokenList"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 主题切换功能
+        function initTheme() {
+            const savedTheme = localStorage.getItem('theme');
+            if (savedTheme === 'light') {
+                document.body.classList.add('light-mode');
+            }
+        }
+
+        function toggleTheme() {
+            const isLight = document.body.classList.toggle('light-mode');
+            localStorage.setItem('theme', isLight ? 'light' : 'dark');
+        }
+
+        // 页面加载时初始化主题
+        initTheme();
+
+        let authToken = '';
+
+        function showAlert(message, type) {
+            const alert = document.getElementById('alert');
+            alert.textContent = message;
+            alert.className = 'alert ' + type + ' show';
+            setTimeout(() => alert.classList.remove('show'), 5000);
+        }
+
+        async function login() {
+            const token = document.getElementById('adminToken').value.trim();
+            if (!token) {
+                showAlert('请输入管理员 Token', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch('/admin/api/tokens', {
+                    headers: {
+                        'Authorization': 'Bearer ' + token
+                    }
+                });
+
+                if (response.ok) {
+                    authToken = token;
+                    document.getElementById('authSection').style.display = 'none';
+                    document.getElementById('content').classList.add('visible');
+                    loadTokens();
+                } else {
+                    const data = await response.json();
+                    showAlert(data.error || '认证失败', 'error');
+                }
+            } catch (error) {
+                showAlert('网络错误: ' + error.message, 'error');
+            }
+        }
+
+        async function loadTokens() {
+            try {
+                const response = await fetch('/admin/api/tokens', {
+                    headers: {
+                        'Authorization': 'Bearer ' + authToken
+                    }
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    displayTokens(data.tokens);
+                } else {
+                    showAlert('加载 Token 列表失败', 'error');
+                }
+            } catch (error) {
+                showAlert('网络错误: ' + error.message, 'error');
+            }
+        }
+
+        function displayTokens(tokens) {
+            const container = document.getElementById('tokenList');
+
+            if (tokens.length === 0) {
+                container.innerHTML = '<div class="empty-state">暂无用户 Token</div>';
+                return;
+            }
+
+            container.innerHTML = tokens.map(token => \`
+                <div class="token-item">
+                    <div class="token-info">
+                        <div class="token-key">\${token.key}</div>
+                        <div class="token-value">\${token.value}</div>
+                    </div>
+                    <div class="token-actions">
+                        <button class="danger" onclick="deleteToken('\${token.key}')">删除</button>
+                        <button onclick="copyToClipboard('\${token.key}')">复制 Token</button>
+                    </div>
+                </div>
+            \`).join('');
+        }
+
+        async function addToken() {
+            const openid = document.getElementById('openid').value.trim();
+            if (!openid) {
+                showAlert('请输入用户 OpenID', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch('/admin/api/tokens', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer ' + authToken
+                    },
+                    body: JSON.stringify({ openid })
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    showAlert('Token 添加成功: ' + data.key, 'success');
+                    document.getElementById('openid').value = '';
+                    loadTokens();
+                } else {
+                    const data = await response.json();
+                    showAlert(data.error || '添加失败', 'error');
+                }
+            } catch (error) {
+                showAlert('网络错误: ' + error.message, 'error');
+            }
+        }
+
+        async function deleteToken(key) {
+            if (!confirm('确定要删除这个 Token 吗？')) return;
+
+            try {
+                const response = await fetch('/admin/api/tokens?' + new URLSearchParams({ key }), {
+                    method: 'DELETE',
+                    headers: {
+                        'Authorization': 'Bearer ' + authToken
+                    }
+                });
+
+                if (response.ok) {
+                    showAlert('Token 删除成功', 'success');
+                    loadTokens();
+                } else {
+                    const data = await response.json();
+                    showAlert(data.error || '删除失败', 'error');
+                }
+            } catch (error) {
+                showAlert('网络错误: ' + error.message, 'error');
+            }
+        }
+
+        function copyToClipboard(text) {
+            navigator.clipboard.writeText(text).then(() => {
+                showAlert('Token 已复制到剪贴板', 'success');
+            }).catch(() => {
+                showAlert('复制失败', 'error');
+            });
+        }
+
+        // 支持回车登录
+        document.getElementById('adminToken').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') login();
+        });
+
+        // 支持回车添加 Token
+        document.getElementById('openid').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') addToken();
+        });
+    </script>
+</body>
+</html>`;
+
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
-    // GET 请求返回首页
-    if (request.method === 'GET') {
+    // 解析请求 URL
+    const url = new URL(request.url);
+    const path = url.pathname;
+
+    // 根路径返回首页
+    if (path === '/') {
       return new Response(INDEX_HTML, {
         status: 200,
         headers: {
@@ -862,68 +1748,155 @@ export default {
       });
     }
 
-    // POST 请求处理消息发送
-    if (request.method !== 'POST') {
-      return new Response(JSON.stringify({
-        errcode: -1,
-        errmsg: 'Only GET and POST methods are allowed'
-      }), {
-        status: 405,
-        headers: { 'Content-Type': 'application/json' }
+    // 管理页面路由
+    if (path === '/admin') {
+      return new Response(ADMIN_HTML, {
+        status: 200,
+        headers: {
+          'Content-Type': 'text/html; charset=utf-8',
+          'Cache-Control': 'no-cache, no-store, must-revalidate'
+        }
       });
     }
 
-    try {
-      // 解析请求体
-      const body = await request.json() as RequestBody;
+    // 管理 API 路由
+    if (path.startsWith('/admin/api/')) {
+      return handleAdminAPI(request, env, url);
+    }
 
-      // 鉴权：检查 token（支持 body 或 header）
-      const clientToken = body.token || request.headers.get('Authorization')?.replace('Bearer ', '');
-      if (!clientToken || clientToken !== env.CLIENT_AUTH_TOKEN) {
+    // /send 路径处理消息发送
+    if (path === '/send') {
+      // 支持 GET 和 POST 方法
+      if (request.method !== 'GET' && request.method !== 'POST') {
         return new Response(JSON.stringify({
           errcode: -1,
-          errmsg: 'Unauthorized: Invalid token'
+          errmsg: 'Method not allowed. Use GET or POST'
         }), {
-          status: 401,
+          status: 405,
           headers: { 'Content-Type': 'application/json' }
         });
       }
 
-      // 验证必填参数
-      if (!body.openid) {
+      try {
+        let params: RequestBody;
+
+        // GET 请求：从 URL query 参数获取
+        if (request.method === 'GET') {
+          params = {
+            token: url.searchParams.get('token') || undefined,
+            openid: url.searchParams.get('openid') || '',
+            from: url.searchParams.get('from') || undefined,
+            desc: url.searchParams.get('desc') || undefined,
+            remark: url.searchParams.get('remark') || undefined,
+            url: url.searchParams.get('url') || undefined
+          };
+        } else {
+          // POST 请求：从请求体获取
+          params = await request.json() as RequestBody;
+        }
+
+        // 鉴权：检查 token（支持参数、body 或 header）
+        const clientToken = params.token || request.headers.get('Authorization')?.replace('Bearer ', '');
+
+        if (!clientToken) {
+          return new Response(JSON.stringify({
+            errcode: -1,
+            errmsg: 'Unauthorized: Missing token'
+          }), {
+            status: 401,
+            headers: { 'Content-Type': 'application/json' }
+          });
+        }
+
+        let actualOpenid = params.openid;
+
+        // 如果 token 以 sk_ 开头，从 KV 获取对应的 openid
+        if (clientToken.startsWith('sk_')) {
+          try {
+            const kv = getKV(env);
+            console.log(`[DEBUG] Attempting to get KV key: ${clientToken}`);
+            const openidFromKV = await kv.get(clientToken);
+            console.log(`[DEBUG] KV result: ${openidFromKV}`);
+
+            if (!openidFromKV) {
+              return new Response(JSON.stringify({
+                errcode: -1,
+                errmsg: 'Unauthorized: Token not found in database'
+              }), {
+                status: 401,
+                headers: { 'Content-Type': 'application/json' }
+              });
+            }
+
+            actualOpenid = openidFromKV;
+          } catch (error) {
+            console.error('[ERROR] KV access failed:', error);
+            return new Response(JSON.stringify({
+              errcode: -1,
+              errmsg: `Server error: Failed to access token database - ${error instanceof Error ? error.message : 'Unknown error'}`
+            }), {
+              status: 500,
+              headers: { 'Content-Type': 'application/json' }
+            });
+          }
+        } else {
+          // 全局 token 鉴权
+          if (clientToken !== env.CLIENT_AUTH_TOKEN) {
+            return new Response(JSON.stringify({
+              errcode: -1,
+              errmsg: 'Unauthorized: Invalid global token'
+            }), {
+              status: 401,
+              headers: { 'Content-Type': 'application/json' }
+            });
+          }
+        }
+
+        // 验证必填参数
+        if (!actualOpenid) {
+          return new Response(JSON.stringify({
+            errcode: -1,
+            errmsg: 'Missing required parameter: openid'
+          }), {
+            status: 400,
+            headers: { 'Content-Type': 'application/json' }
+          });
+        }
+
+        // 调用发送消息函数
+        const result = await sendWechatMessage(env, {
+          openid: actualOpenid,
+          from: params.from,
+          desc: params.desc,
+          remark: params.remark,
+          url: params.url
+        });
+
+        return new Response(JSON.stringify(result), {
+          status: result.errcode === 0 ? 200 : 500,
+          headers: { 'Content-Type': 'application/json' }
+        });
+
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
         return new Response(JSON.stringify({
           errcode: -1,
-          errmsg: 'Missing required parameter: openid'
+          errmsg: `Server error: ${errorMessage}`
         }), {
-          status: 400,
+          status: 500,
           headers: { 'Content-Type': 'application/json' }
         });
       }
-
-      // 调用发送消息函数
-      const result = await sendWechatMessage(env, {
-        openid: body.openid,
-        from: body.from,
-        desc: body.desc,
-        remark: body.remark,
-        url: body.url
-      });
-
-      return new Response(JSON.stringify(result), {
-        status: result.errcode === 0 ? 200 : 500,
-        headers: { 'Content-Type': 'application/json' }
-      });
-
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      return new Response(JSON.stringify({
-        errcode: -1,
-        errmsg: `Server error: ${errorMessage}`
-      }), {
-        status: 500,
-        headers: { 'Content-Type': 'application/json' }
-      });
     }
+
+    // 404 - 其他路径
+    return new Response(JSON.stringify({
+      errcode: -1,
+      errmsg: 'Not found. Use / for homepage or /send for message sending'
+    }), {
+      status: 404,
+      headers: { 'Content-Type': 'application/json' }
+    });
   }
 };
 
@@ -955,9 +1928,14 @@ async function getAccessToken(env: Env, forceRefresh: boolean = false): Promise<
 
   // 如果不强制刷新，先尝试从 KV 读取
   if (!forceRefresh) {
-    const cachedToken = await kv.get(KV_KEY);
-    if (cachedToken) {
-      return cachedToken;
+    try {
+      const cachedToken = await kv.get(KV_KEY);
+      if (cachedToken) {
+        return cachedToken;
+      }
+    } catch (error) {
+      // KV 读取失败（本地开发环境可能 KV 为空），忽略并继续请求新 token
+      console.log('KV read failed, requesting new token:', error instanceof Error ? error.message : 'Unknown error');
     }
   }
 
@@ -969,9 +1947,14 @@ async function getAccessToken(env: Env, forceRefresh: boolean = false): Promise<
 
   if (data.access_token) {
     // 存入 KV，TTL 设置为 7000 秒（略低于微信官方的 7200 秒）
-    await kv.put(KV_KEY, data.access_token, {
-      expirationTtl: 7000
-    });
+    try {
+      await kv.put(KV_KEY, data.access_token, {
+        expirationTtl: 7000
+      });
+    } catch (error) {
+      // KV 写入失败不影响主流程，仅在本地开发时发生
+      console.log('KV write failed (non-critical):', error instanceof Error ? error.message : 'Unknown error');
+    }
     return data.access_token;
   } else {
     throw new Error(`Failed to get access token: ${data.errmsg || 'Unknown error'}`);
@@ -1041,4 +2024,153 @@ async function sendWechatMessage(
   }
 
   return result;
+}
+
+/**
+ * 生成随机 Token
+ * @param length - Token 长度（不包括 sk_ 前缀）
+ * @returns 随机 Token
+ */
+function generateToken(length: number = 16): string {
+  const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  let result = '';
+  for (let i = 0; i < length; i++) {
+    result += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return 'sk_' + result;
+}
+
+/**
+ * 处理管理 API 请求
+ * @param request - 请求对象
+ * @param env - 环境变量
+ * @param url - URL 对象
+ * @returns API 响应
+ */
+async function handleAdminAPI(request: Request, env: Env, url: URL): Promise<Response> {
+  // 验证管理员 Token
+  const authHeader = request.headers.get('Authorization');
+  const adminToken = authHeader?.replace('Bearer ', '');
+
+  if (!adminToken || adminToken !== env.CLIENT_AUTH_TOKEN) {
+    return new Response(JSON.stringify({
+      error: 'Unauthorized: Invalid admin token'
+    }), {
+      status: 401,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
+
+  const kv = getKV(env);
+  const path = url.pathname;
+
+  try {
+    // GET /admin/api/tokens - 列出所有 sk_ 开头的 token
+    if (path === '/admin/api/tokens' && request.method === 'GET') {
+      const tokens: { key: string; value: string }[] = [];
+
+      // 列出 KV 中的所有 keys
+      const listResult = await kv.list();
+      for (const key of listResult.keys) {
+        if (key.name.startsWith('sk_')) {
+          const value = await kv.get(key.name);
+          if (value) {
+            tokens.push({ key: key.name, value });
+          }
+        }
+      }
+
+      return new Response(JSON.stringify({ tokens }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+
+    // POST /admin/api/tokens - 添加新的用户 token
+    if (path === '/admin/api/tokens' && request.method === 'POST') {
+      const body = await request.json() as { openid: string };
+
+      if (!body.openid) {
+        return new Response(JSON.stringify({
+          error: 'Missing required parameter: openid'
+        }), {
+          status: 400,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
+
+      // 自动生成 sk_ 开头的 token
+      const newToken = generateToken(16);
+
+      // 检查 token 是否已存在
+      const existing = await kv.get(newToken);
+      if (existing) {
+        // 极低概率的冲突，重新生成
+        return await handleAdminAPI(request, env, url);
+      }
+
+      // 存储 token -> openid 映射
+      await kv.put(newToken, body.openid);
+
+      return new Response(JSON.stringify({
+        success: true,
+        key: newToken,
+        value: body.openid
+      }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+
+    // DELETE /admin/api/tokens?key=xxx - 删除 token
+    if (path === '/admin/api/tokens' && request.method === 'DELETE') {
+      const key = url.searchParams.get('key');
+
+      if (!key) {
+        return new Response(JSON.stringify({
+          error: 'Missing required parameter: key'
+        }), {
+          status: 400,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
+
+      // 只允许删除 sk_ 开头的 token
+      if (!key.startsWith('sk_')) {
+        return new Response(JSON.stringify({
+          error: 'Can only delete user tokens (sk_*)'
+        }), {
+          status: 400,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
+
+      await kv.delete(key);
+
+      return new Response(JSON.stringify({
+        success: true,
+        message: 'Token deleted successfully'
+      }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+
+    // 未找到的 API 端点
+    return new Response(JSON.stringify({
+      error: 'API endpoint not found'
+    }), {
+      status: 404,
+      headers: { 'Content-Type': 'application/json' }
+    });
+
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    return new Response(JSON.stringify({
+      error: `Server error: ${errorMessage}`
+    }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
 }

@@ -7,7 +7,6 @@
 ### 1. 安装依赖
 
 ```bash
-cd /Volumes/work/project/FlareMsg/src
 npm install
 ```
 
@@ -129,6 +128,7 @@ curl -X POST http://localhost:8787 \
 ### 方法 2: 使用 HTTPie（更友好的输出）
 
 安装 HTTPie:
+
 ```bash
 brew install httpie  # macOS
 # 或
@@ -136,6 +136,7 @@ pip install httpie
 ```
 
 测试请求:
+
 ```bash
 http POST http://localhost:8787 \
   token="你的CLIENT_AUTH_TOKEN" \
@@ -149,6 +150,7 @@ http POST http://localhost:8787 \
 2. URL: `http://localhost:8787`
 3. Headers: `Content-Type: application/json`
 4. Body (JSON):
+
 ```json
 {
   "token": "你的CLIENT_AUTH_TOKEN",
@@ -166,6 +168,7 @@ http POST http://localhost:8787 \
 ```
 
 脚本会提示你输入：
+
 ```
 === FlareMsg 本地测试 ===
 
@@ -178,6 +181,7 @@ WECHAT_OPENID (微信 OpenID): oABCD1234567890
 ```
 
 脚本会自动执行 6 个测试用例：
+
 1. 基础发送（仅必填参数）
 2. 完整参数发送
 3. Header 鉴权
@@ -202,15 +206,19 @@ Wrangler dev 会自动显示请求日志：
 
 ```typescript
 export default {
-  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
-    console.log('收到请求:', request.method, request.url);
+  async fetch(
+    request: Request,
+    env: Env,
+    ctx: ExecutionContext,
+  ): Promise<Response> {
+    console.log("收到请求:", request.method, request.url);
 
-    const body = await request.json() as RequestBody;
-    console.log('请求体:', JSON.stringify(body, null, 2));
+    const body = (await request.json()) as RequestBody;
+    console.log("请求体:", JSON.stringify(body, null, 2));
 
     // ... 其他代码
-  }
-}
+  },
+};
 ```
 
 ### 使用 wrangler tail（查看远程日志）
@@ -227,11 +235,13 @@ wrangler tail
 ### 1. KV Namespace 未找到
 
 **错误信息**:
+
 ```
 KV Namespace binding "WECHAT_KV" not found
 ```
 
 **解决方案**:
+
 - 本地开发时，KV 会自动模拟，不需要真实的 KV
 - 如果使用 `--remote` 模式，需要先创建 KV:
   ```bash
@@ -241,11 +251,13 @@ KV Namespace binding "WECHAT_KV" not found
 ### 2. 环境变量未加载
 
 **错误信息**:
+
 ```
 env.WECHAT_APP_ID is undefined
 ```
 
 **解决方案**:
+
 - 检查 `.dev.vars` 文件是否存在且格式正确
 - 确保 `.dev.vars` 在 `src/` 目录下
 - 重启 `wrangler dev`
@@ -253,11 +265,13 @@ env.WECHAT_APP_ID is undefined
 ### 3. 微信 API 调用失败
 
 **错误信息**:
+
 ```
 Failed to get access token: invalid appid
 ```
 
 **解决方案**:
+
 - 检查 `WECHAT_APP_ID` 和 `WECHAT_APP_SECRET` 是否正确
 - 确认微信测试号是否有效
 - 检查网络连接
@@ -278,11 +292,13 @@ npm run dev
 ### 5. 端口被占用
 
 **错误信息**:
+
 ```
 Error: listen EADDRINUSE: address already in use :::8787
 ```
 
 **解决方案**:
+
 ```bash
 # 查找占用端口的进程
 lsof -i :8787
@@ -316,6 +332,7 @@ ab -n 100 -c 10 -p payload.json -T application/json http://localhost:8787/
 ```
 
 `payload.json`:
+
 ```json
 {
   "token": "你的CLIENT_AUTH_TOKEN",
@@ -335,6 +352,7 @@ wrk -t2 -c10 -d30s -s post.lua http://localhost:8787/
 ```
 
 `post.lua`:
+
 ```lua
 wrk.method = "POST"
 wrk.body   = '{"token":"你的TOKEN","openid":"你的OPENID","desc":"wrk测试"}'
@@ -346,11 +364,13 @@ wrk.headers["Content-Type"] = "application/json"
 测试通过后，可以：
 
 1. **部署到 Cloudflare**:
+
    ```bash
    wrangler deploy
    ```
 
 2. **查看生产日志**:
+
    ```bash
    wrangler tail
    ```
