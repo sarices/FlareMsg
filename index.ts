@@ -1776,7 +1776,7 @@ const ADMIN_HTML = `<!DOCTYPE html>
 // 环境变量类型定义
 interface Env {
   // KV Namespace (动态 binding)
-  [key: string]: any;  // 支持动态访问 KV binding
+  [key: string]: any; // 支持动态访问 KV binding
 
   // Secrets
   WECHAT_APP_ID: string;
@@ -1785,7 +1785,7 @@ interface Env {
 
   // 配置变量
   WECHAT_TEMPLATE_ID: string;
-  KV_BINDING_NAME?: string;  // KV Namespace 的 binding 名称（默认: "WECHAT_KV"）
+  KV_BINDING_NAME?: string; // KV Namespace 的 binding 名称（默认: "WECHAT_KV"）
   DEFAULT_FROM?: string;
   DEFAULT_DESC?: string;
   DEFAULT_REMARK?: string;
@@ -1793,8 +1793,8 @@ interface Env {
   COLOR_FROM?: string;
   COLOR_DESC?: string;
   COLOR_REMARK?: string;
-  RATE_LIMIT_RPM?: number;  // 全局 RPM 限制（每分钟请求数），0 或未设置表示不限制
-  ALLOWED_ORIGIN?: string;  // CORS 允许的来源（默认: "*"）
+  RATE_LIMIT_RPM?: number; // 全局 RPM 限制（每分钟请求数），0 或未设置表示不限制
+  ALLOWED_ORIGIN?: string; // CORS 允许的来源（默认: "*"）
 }
 
 // 请求体类型定义
@@ -1833,20 +1833,20 @@ const SECURITY_CONSTANTS = {
 
   // 安全响应头
   SECURITY_HEADERS: {
-    'X-Content-Type-Options': 'nosniff',
-    'X-Frame-Options': 'DENY',
-    'X-XSS-Protection': '1; mode=block',
-    'Strict-Transport-Security': 'max-age=31536000',
-    'Referrer-Policy': 'strict-origin-when-cross-origin',
-    'Permissions-Policy': 'geolocation=(), microphone=(), camera=()'
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "DENY",
+    "X-XSS-Protection": "1; mode=block",
+    "Strict-Transport-Security": "max-age=31536000",
+    "Referrer-Policy": "strict-origin-when-cross-origin",
+    "Permissions-Policy": "geolocation=(), microphone=(), camera=()",
   },
 
   // CORS 响应头
   CORS_HEADERS: {
-    'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-    'Access-Control-Max-Age': '86400'
-  }
+    "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization",
+    "Access-Control-Max-Age": "86400",
+  },
 };
 
 // 微信模版消息 Payload 类型
@@ -1870,31 +1870,31 @@ interface WechatTemplatePayload {
  */
 function createSecureHeaders(
   env: Env,
-  contentType: string = 'application/json',
-  additionalHeaders: Record<string, string> = {}
+  contentType: string = "application/json",
+  additionalHeaders: Record<string, string> = {},
 ): Record<string, string> {
   const headers: Record<string, string> = {
-    'Content-Type': contentType,
+    "Content-Type": contentType,
     ...SECURITY_CONSTANTS.SECURITY_HEADERS,
-    ...additionalHeaders
+    ...additionalHeaders,
   };
 
   // 添加 CORS 头（如果配置了允许的来源）
-  const allowedOrigin = env.ALLOWED_ORIGIN || '*';
-  headers['Access-Control-Allow-Origin'] = allowedOrigin;
+  const allowedOrigin = env.ALLOWED_ORIGIN || "*";
+  headers["Access-Control-Allow-Origin"] = allowedOrigin;
   Object.assign(headers, SECURITY_CONSTANTS.CORS_HEADERS);
 
   // 为 HTML 添加 CSP
-  if (contentType.includes('text/html')) {
-    headers['Content-Security-Policy'] = [
+  if (contentType.includes("text/html")) {
+    headers["Content-Security-Policy"] = [
       "default-src 'self'",
       "script-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       "font-src 'self' https://fonts.gstatic.com",
       "img-src 'self' data:",
       "connect-src 'self'",
-      "frame-ancestors 'none'"
-    ].join('; ');
+      "frame-ancestors 'none'",
+    ].join("; ");
   }
 
   return headers;
@@ -1910,29 +1910,32 @@ function createSecureHeaders(
 function createErrorResponse(
   message: string,
   status: number,
-  env?: Env
+  env?: Env,
 ): Response {
   // 只返回通用错误信息，不暴露系统细节
   const errorMap: Record<number, string> = {
-    400: 'Bad Request',
-    401: 'Unauthorized',
-    403: 'Forbidden',
-    404: 'Not Found',
-    429: 'Too Many Requests',
-    500: 'Internal Server Error'
+    400: "Bad Request",
+    401: "Unauthorized",
+    403: "Forbidden",
+    404: "Not Found",
+    429: "Too Many Requests",
+    500: "Internal Server Error",
   };
 
-  const publicMessage = errorMap[status] || 'Error';
+  const publicMessage = errorMap[status] || "Error";
 
-  return new Response(JSON.stringify({
-    errcode: -1,
-    errmsg: publicMessage
-  }), {
-    status,
-    headers: env
-      ? createSecureHeaders(env, 'application/json')
-      : { 'Content-Type': 'application/json' }
-  });
+  return new Response(
+    JSON.stringify({
+      errcode: -1,
+      errmsg: publicMessage,
+    }),
+    {
+      status,
+      headers: env
+        ? createSecureHeaders(env, "application/json")
+        : { "Content-Type": "application/json" },
+    },
+  );
 }
 
 /**
@@ -1940,176 +1943,194 @@ function createErrorResponse(
  * @param params - 请求参数
  * @returns 验证结果 { valid: boolean, error?: string }
  */
-function validateInput(params: RequestBody): { valid: boolean; error?: string } {
+function validateInput(params: RequestBody): {
+  valid: boolean;
+  error?: string;
+} {
   const { openid, from, desc, remark, url } = params;
 
   // 验证 openid
   if (openid && openid.length > SECURITY_CONSTANTS.MAX_OPENID_LENGTH) {
-    return { valid: false, error: 'Invalid openid length' };
+    return { valid: false, error: "Invalid openid length" };
   }
 
   // 验证长度
   if (from && from.length > SECURITY_CONSTANTS.MAX_INPUT_LENGTH) {
-    return { valid: false, error: 'From field too long' };
+    return { valid: false, error: "From field too long" };
   }
 
   if (desc && desc.length > SECURITY_CONSTANTS.MAX_INPUT_LENGTH) {
-    return { valid: false, error: 'Description field too long' };
+    return { valid: false, error: "Description field too long" };
   }
 
   if (remark && remark.length > SECURITY_CONSTANTS.MAX_INPUT_LENGTH) {
-    return { valid: false, error: 'Remark field too long' };
+    return { valid: false, error: "Remark field too long" };
   }
 
   if (url && url.length > SECURITY_CONSTANTS.MAX_URL_LENGTH) {
-    return { valid: false, error: 'URL too long' };
+    return { valid: false, error: "URL too long" };
   }
 
   // 验证 URL 格式（如果提供）
-  if (url && url.trim() !== '') {
+  if (url && url.trim() !== "") {
     try {
       new URL(url);
     } catch {
-      return { valid: false, error: 'Invalid URL format' };
+      return { valid: false, error: "Invalid URL format" };
     }
   }
 
   return { valid: true };
 }
 
-
 // 首页 HTML 页面
 export default {
-  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+  async fetch(
+    request: Request,
+    env: Env,
+    ctx: ExecutionContext,
+  ): Promise<Response> {
     // 解析请求 URL
     const url = new URL(request.url);
     const path = url.pathname;
 
-    // 临时注释环境变量检查，用于调试
-    // TODO: 修复后恢复检查
-    /*
+    //环境变量检查
     if (!env.WECHAT_TEMPLATE_ID) {
-      return createErrorResponse('Server configuration error: Missing WECHAT_TEMPLATE_ID', 500);
+      return createErrorResponse(
+        "Server configuration error: Missing WECHAT_TEMPLATE_ID",
+        500,
+      );
     }
 
     if (!env.CLIENT_AUTH_TOKEN) {
-      return createErrorResponse('Server configuration error: Missing CLIENT_AUTH_TOKEN', 500);
+      return createErrorResponse(
+        "Server configuration error: Missing CLIENT_AUTH_TOKEN",
+        500,
+      );
     }
-    */
 
     // 根路径返回首页
-    if (path === '/') {
+    if (path === "/") {
       return new Response(INDEX_HTML, {
         status: 200,
-        headers: createSecureHeaders(env, 'text/html; charset=utf-8', {
-          'Cache-Control': 'no-cache, no-store, must-revalidate'
-        })
+        headers: createSecureHeaders(env, "text/html; charset=utf-8", {
+          "Cache-Control": "no-cache, no-store, must-revalidate",
+        }),
       });
     }
 
     // 管理页面路由
-    if (path === '/admin') {
+    if (path === "/admin") {
       return new Response(ADMIN_HTML, {
         status: 200,
-        headers: createSecureHeaders(env, 'text/html; charset=utf-8', {
-          'Cache-Control': 'no-cache, no-store, must-revalidate'
-        })
+        headers: createSecureHeaders(env, "text/html; charset=utf-8", {
+          "Cache-Control": "no-cache, no-store, must-revalidate",
+        }),
       });
     }
 
     // 处理 OPTIONS 请求（CORS 预检）
-    if (request.method === 'OPTIONS') {
+    if (request.method === "OPTIONS") {
       return new Response(null, {
         status: 204,
-        headers: createSecureHeaders(env)
+        headers: createSecureHeaders(env),
       });
     }
 
     // 全局 RPM 限制检查（对所有 API 接口生效）
     const rateLimitPassed = await checkRateLimit(env);
     if (!rateLimitPassed) {
-      return new Response(JSON.stringify({
-        errcode: -2,
-        errmsg: 'Too Many Requests'
-      }), {
-        status: 429,
-        headers: {
-          ...createSecureHeaders(env, 'application/json'),
-          'Retry-After': '60'
-        }
-      });
+      return new Response(
+        JSON.stringify({
+          errcode: -2,
+          errmsg: "Too Many Requests",
+        }),
+        {
+          status: 429,
+          headers: {
+            ...createSecureHeaders(env, "application/json"),
+            "Retry-After": "60",
+          },
+        },
+      );
     }
 
     // 管理 API 路由
-    if (path.startsWith('/admin/api/')) {
+    if (path.startsWith("/admin/api/")) {
       return handleAdminAPI(request, env, url);
     }
 
     // /send 路径处理消息发送
-    if (path === '/send') {
+    if (path === "/send") {
       // 支持 GET 和 POST 方法
-      if (request.method !== 'GET' && request.method !== 'POST') {
-        return createErrorResponse('Method not allowed', 405, env);
+      if (request.method !== "GET" && request.method !== "POST") {
+        return createErrorResponse("Method not allowed", 405, env);
       }
 
       try {
         let params: RequestBody;
 
         // GET 请求：从 URL query 参数获取
-        if (request.method === 'GET') {
+        if (request.method === "GET") {
           params = {
-            token: url.searchParams.get('token') || undefined,
-            openid: url.searchParams.get('openid') || '',
-            from: url.searchParams.get('from') || undefined,
-            desc: url.searchParams.get('desc') || undefined,
-            remark: url.searchParams.get('remark') || undefined,
-            url: url.searchParams.get('url') || undefined
+            token: url.searchParams.get("token") || undefined,
+            openid: url.searchParams.get("openid") || "",
+            from: url.searchParams.get("from") || undefined,
+            desc: url.searchParams.get("desc") || undefined,
+            remark: url.searchParams.get("remark") || undefined,
+            url: url.searchParams.get("url") || undefined,
           };
         } else {
           // POST 请求：从请求体获取
-          params = await request.json() as RequestBody;
+          params = (await request.json()) as RequestBody;
         }
 
         // 输入验证
         const validation = validateInput(params);
         if (!validation.valid) {
-          return createErrorResponse(validation.error || 'Invalid input', 400, env);
+          return createErrorResponse(
+            validation.error || "Invalid input",
+            400,
+            env,
+          );
         }
 
         // 鉴权：检查 token（支持参数、body 或 header）
-        const clientToken = params.token || request.headers.get('Authorization')?.replace('Bearer ', '');
+        const clientToken =
+          params.token ||
+          request.headers.get("Authorization")?.replace("Bearer ", "");
 
         if (!clientToken) {
-          return createErrorResponse('Unauthorized', 401, env);
+          return createErrorResponse("Unauthorized", 401, env);
         }
 
         let actualOpenid = params.openid;
 
         // 如果 token 以 sk_ 开头，从 KV 获取对应的 openid
-        if (clientToken.startsWith('sk_')) {
+        if (clientToken.startsWith("sk_")) {
           try {
             const kv = getKV(env);
             const openidFromKV = await kv.get(clientToken);
 
             if (!openidFromKV) {
-              return createErrorResponse('Unauthorized', 401, env);
+              return createErrorResponse("Unauthorized", 401, env);
             }
 
             actualOpenid = openidFromKV;
           } catch (error) {
-            console.error('[ERROR] KV access failed:', error);
-            return createErrorResponse('Internal Server Error', 500, env);
+            console.error("[ERROR] KV access failed:", error);
+            return createErrorResponse("Internal Server Error", 500, env);
           }
         } else {
           // 全局 token 鉴权
           if (clientToken !== env.CLIENT_AUTH_TOKEN) {
-            return createErrorResponse('Unauthorized', 401, env);
+            return createErrorResponse("Unauthorized", 401, env);
           }
         }
 
         // 验证必填参数
         if (!actualOpenid) {
-          return createErrorResponse('Bad Request', 400, env);
+          return createErrorResponse("Bad Request", 400, env);
         }
 
         // 调用发送消息函数
@@ -2118,23 +2139,22 @@ export default {
           from: params.from,
           desc: params.desc,
           remark: params.remark,
-          url: params.url
+          url: params.url,
         });
 
         return new Response(JSON.stringify(result), {
           status: result.errcode === 0 ? 200 : 500,
-          headers: createSecureHeaders(env, 'application/json')
+          headers: createSecureHeaders(env, "application/json"),
         });
-
       } catch (error) {
-        console.error('[ERROR] Message send failed:', error);
-        return createErrorResponse('Internal Server Error', 500, env);
+        console.error("[ERROR] Message send failed:", error);
+        return createErrorResponse("Internal Server Error", 500, env);
       }
     }
 
     // 404 - 其他路径
-    return createErrorResponse('Not Found', 404, env);
-  }
+    return createErrorResponse("Not Found", 404, env);
+  },
 };
 
 /**
@@ -2143,12 +2163,12 @@ export default {
  * @returns KV Namespace 实例
  */
 function getKV(env: Env): KVNamespace {
-  const bindingName = env.KV_BINDING_NAME || 'WECHAT_KV';
+  const bindingName = env.KV_BINDING_NAME || "WECHAT_KV";
   const kv = env[bindingName] as KVNamespace;
 
   if (!kv) {
     // 不暴露具体的 binding 名称
-    throw new Error('KV Namespace not configured');
+    throw new Error("KV Namespace not configured");
   }
 
   return kv;
@@ -2186,13 +2206,16 @@ async function checkRateLimit(env: Env): Promise<boolean> {
 
     // 增加计数，并设置 TTL 为 60 秒（自动过期）
     await kv.put(rateLimitKey, String(count + 1), {
-      expirationTtl: 60
+      expirationTtl: 60,
     });
 
     return true;
   } catch (error) {
     // KV 访问失败时，采用 fail-closed 策略，拒绝请求以保护系统
-    console.error('[ERROR] Rate limit check failed (fail-closed):', error instanceof Error ? error.message : 'Unknown error');
+    console.error(
+      "[ERROR] Rate limit check failed (fail-closed):",
+      error instanceof Error ? error.message : "Unknown error",
+    );
 
     // 如果 RPM 限制已启用，KV 故障时拒绝请求
     // 这样可以在 KV 不可用时保护系统免受滥用
@@ -2206,9 +2229,12 @@ async function checkRateLimit(env: Env): Promise<boolean> {
  * @param forceRefresh - 是否强制刷新
  * @returns Access Token
  */
-async function getAccessToken(env: Env, forceRefresh: boolean = false): Promise<string> {
+async function getAccessToken(
+  env: Env,
+  forceRefresh: boolean = false,
+): Promise<string> {
   const kv = getKV(env);
-  const KV_KEY = 'access_token';
+  const KV_KEY = "access_token";
 
   // 如果不强制刷新，先尝试从 KV 读取
   if (!forceRefresh) {
@@ -2219,7 +2245,10 @@ async function getAccessToken(env: Env, forceRefresh: boolean = false): Promise<
       }
     } catch (error) {
       // KV 读取失败（本地开发环境可能 KV 为空），忽略并继续请求新 token
-      console.log('KV read failed, requesting new token:', error instanceof Error ? error.message : 'Unknown error');
+      console.log(
+        "KV read failed, requesting new token:",
+        error instanceof Error ? error.message : "Unknown error",
+      );
     }
   }
 
@@ -2227,21 +2256,26 @@ async function getAccessToken(env: Env, forceRefresh: boolean = false): Promise<
   const tokenUrl = `https://api.weixin.qq.com/cgi-bin/token?grant_type=client_credential&appid=${env.WECHAT_APP_ID}&secret=${env.WECHAT_APP_SECRET}`;
 
   const response = await fetch(tokenUrl);
-  const data = await response.json() as WechatApiResponse;
+  const data = (await response.json()) as WechatApiResponse;
 
   if (data.access_token) {
     // 存入 KV，TTL 设置为 7000 秒（略低于微信官方的 7200 秒）
     try {
       await kv.put(KV_KEY, data.access_token, {
-        expirationTtl: 7000
+        expirationTtl: 7000,
       });
     } catch (error) {
       // KV 写入失败不影响主流程，仅在本地开发时发生
-      console.log('KV write failed (non-critical):', error instanceof Error ? error.message : 'Unknown error');
+      console.log(
+        "KV write failed (non-critical):",
+        error instanceof Error ? error.message : "Unknown error",
+      );
     }
     return data.access_token;
   } else {
-    throw new Error(`Failed to get access token: ${data.errmsg || 'Unknown error'}`);
+    throw new Error(
+      `Failed to get access token: ${data.errmsg || "Unknown error"}`,
+    );
   }
 }
 
@@ -2255,16 +2289,16 @@ async function getAccessToken(env: Env, forceRefresh: boolean = false): Promise<
 async function sendWechatMessage(
   env: Env,
   payload: MessagePayload,
-  isRetry: boolean = false
+  isRetry: boolean = false,
 ): Promise<WechatApiResponse> {
   // 获取 Access Token
   const accessToken = await getAccessToken(env, false);
 
   // 应用三级优先级：请求参数 > 环境变量 > 默认值
-  const from = payload.from || env.DEFAULT_FROM || '系统通知';
-  const desc = payload.desc || env.DEFAULT_DESC || '无内容';
-  const remark = payload.remark || env.DEFAULT_REMARK || '';
-  const url = payload.url || env.DEFAULT_URL || '';
+  const from = payload.from || env.DEFAULT_FROM || "系统通知";
+  const desc = payload.desc || env.DEFAULT_DESC || "无内容";
+  const remark = payload.remark || env.DEFAULT_REMARK || "";
+  const url = payload.url || env.DEFAULT_URL || "";
 
   // 构造微信模版消息 payload
   const wechatPayload: WechatTemplatePayload = {
@@ -2274,36 +2308,36 @@ async function sendWechatMessage(
     data: {
       FROM: {
         value: from,
-        color: env.COLOR_FROM || '#173177'
+        color: env.COLOR_FROM || "#173177",
       },
       DESC: {
         value: desc,
-        color: env.COLOR_DESC || '#000000'
+        color: env.COLOR_DESC || "#000000",
       },
       REMARK: {
         value: remark,
-        color: env.COLOR_REMARK || '#888888'
-      }
-    }
+        color: env.COLOR_REMARK || "#888888",
+      },
+    },
   };
 
   // 调用微信 API
   const apiUrl = `https://api.weixin.qq.com/cgi-bin/message/template/send?access_token=${accessToken}`;
   const response = await fetch(apiUrl, {
-    method: 'POST',
+    method: "POST",
     headers: {
-      'Content-Type': 'application/json'
+      "Content-Type": "application/json",
     },
-    body: JSON.stringify(wechatPayload)
+    body: JSON.stringify(wechatPayload),
   });
 
-  const result = await response.json() as WechatApiResponse;
+  const result = (await response.json()) as WechatApiResponse;
 
   // Token 失效自动重试逻辑
   if (result.errcode === 40001 && !isRetry) {
     // Token 无效，删除 KV 缓存并重试
     const kv = getKV(env);
-    await kv.delete('access_token');
+    await kv.delete("access_token");
     return await sendWechatMessage(env, payload, true);
   }
 
@@ -2321,11 +2355,11 @@ function generateToken(length: number = 32): string {
   crypto.getRandomValues(array);
 
   // 转换为十六进制字符串
-  const hexString = Array.from(array, byte =>
-    byte.toString(16).padStart(2, '0')
-  ).join('');
+  const hexString = Array.from(array, (byte) =>
+    byte.toString(16).padStart(2, "0"),
+  ).join("");
 
-  return 'sk_' + hexString;
+  return "sk_" + hexString;
 }
 
 /**
@@ -2335,18 +2369,25 @@ function generateToken(length: number = 32): string {
  * @param url - URL 对象
  * @returns API 响应
  */
-async function handleAdminAPI(request: Request, env: Env, url: URL): Promise<Response> {
+async function handleAdminAPI(
+  request: Request,
+  env: Env,
+  url: URL,
+): Promise<Response> {
   // 验证管理员 Token
-  const authHeader = request.headers.get('Authorization');
-  const adminToken = authHeader?.replace('Bearer ', '');
+  const authHeader = request.headers.get("Authorization");
+  const adminToken = authHeader?.replace("Bearer ", "");
 
   if (!adminToken || adminToken !== env.CLIENT_AUTH_TOKEN) {
-    return new Response(JSON.stringify({
-      error: 'Unauthorized'
-    }), {
-      status: 401,
-      headers: createSecureHeaders(env, 'application/json')
-    });
+    return new Response(
+      JSON.stringify({
+        error: "Unauthorized",
+      }),
+      {
+        status: 401,
+        headers: createSecureHeaders(env, "application/json"),
+      },
+    );
   }
 
   const kv = getKV(env);
@@ -2354,18 +2395,24 @@ async function handleAdminAPI(request: Request, env: Env, url: URL): Promise<Res
 
   try {
     // GET /admin/api/tokens - 列出所有 sk_ 开头的 token
-    if (path === '/admin/api/tokens' && request.method === 'GET') {
+    if (path === "/admin/api/tokens" && request.method === "GET") {
       const tokens: { key: string; value: string }[] = [];
       let cursor: string | undefined = undefined;
 
       try {
         // 使用循环处理分页，确保获取所有 keys
         do {
-          const listResult = await kv.list({ cursor }) as { keys: Array<{ name: string }>, list_complete: boolean, cursor?: string };
-          console.log(`[DEBUG] KV list result: keys=${listResult.keys.length}, list_complete=${listResult.list_complete}, cursor=${listResult.cursor ? 'exists' : 'none'}`);
+          const listResult = (await kv.list({ cursor })) as {
+            keys: Array<{ name: string }>;
+            list_complete: boolean;
+            cursor?: string;
+          };
+          console.log(
+            `[DEBUG] KV list result: keys=${listResult.keys.length}, list_complete=${listResult.list_complete}, cursor=${listResult.cursor ? "exists" : "none"}`,
+          );
 
           for (const key of listResult.keys) {
-            if (key.name.startsWith('sk_')) {
+            if (key.name.startsWith("sk_")) {
               const value = await kv.get(key.name);
               if (value) {
                 tokens.push({ key: key.name, value });
@@ -2382,25 +2429,28 @@ async function handleAdminAPI(request: Request, env: Env, url: URL): Promise<Res
 
         return new Response(JSON.stringify({ tokens }), {
           status: 200,
-          headers: createSecureHeaders(env, 'application/json')
+          headers: createSecureHeaders(env, "application/json"),
         });
       } catch (error) {
-        console.error('[ERROR] Failed to list tokens:', error);
-        return createErrorResponse('Internal Server Error', 500, env);
+        console.error("[ERROR] Failed to list tokens:", error);
+        return createErrorResponse("Internal Server Error", 500, env);
       }
     }
 
     // POST /admin/api/tokens - 添加新的用户 token
-    if (path === '/admin/api/tokens' && request.method === 'POST') {
-      const body = await request.json() as { openid: string };
+    if (path === "/admin/api/tokens" && request.method === "POST") {
+      const body = (await request.json()) as { openid: string };
 
       if (!body.openid) {
-        return new Response(JSON.stringify({
-          error: 'Bad Request'
-        }), {
-          status: 400,
-          headers: createSecureHeaders(env, 'application/json')
-        });
+        return new Response(
+          JSON.stringify({
+            error: "Bad Request",
+          }),
+          {
+            status: 400,
+            headers: createSecureHeaders(env, "application/json"),
+          },
+        );
       }
 
       // 自动生成 sk_ 开头的 token（修改为 32 字节，更安全）
@@ -2416,54 +2466,65 @@ async function handleAdminAPI(request: Request, env: Env, url: URL): Promise<Res
       // 存储 token -> openid 映射
       await kv.put(newToken, body.openid);
 
-      return new Response(JSON.stringify({
-        success: true,
-        key: newToken,
-        value: body.openid
-      }), {
-        status: 200,
-        headers: createSecureHeaders(env, 'application/json')
-      });
+      return new Response(
+        JSON.stringify({
+          success: true,
+          key: newToken,
+          value: body.openid,
+        }),
+        {
+          status: 200,
+          headers: createSecureHeaders(env, "application/json"),
+        },
+      );
     }
 
     // DELETE /admin/api/tokens?key=xxx - 删除 token
-    if (path === '/admin/api/tokens' && request.method === 'DELETE') {
-      const key = url.searchParams.get('key');
+    if (path === "/admin/api/tokens" && request.method === "DELETE") {
+      const key = url.searchParams.get("key");
 
       if (!key) {
-        return new Response(JSON.stringify({
-          error: 'Bad Request'
-        }), {
-          status: 400,
-          headers: createSecureHeaders(env, 'application/json')
-        });
+        return new Response(
+          JSON.stringify({
+            error: "Bad Request",
+          }),
+          {
+            status: 400,
+            headers: createSecureHeaders(env, "application/json"),
+          },
+        );
       }
 
       // 只允许删除 sk_ 开头的 token
-      if (!key.startsWith('sk_')) {
-        return new Response(JSON.stringify({
-          error: 'Bad Request'
-        }), {
-          status: 400,
-          headers: createSecureHeaders(env, 'application/json')
-        });
+      if (!key.startsWith("sk_")) {
+        return new Response(
+          JSON.stringify({
+            error: "Bad Request",
+          }),
+          {
+            status: 400,
+            headers: createSecureHeaders(env, "application/json"),
+          },
+        );
       }
 
       await kv.delete(key);
 
-      return new Response(JSON.stringify({
-        success: true
-      }), {
-        status: 200,
-        headers: createSecureHeaders(env, 'application/json')
-      });
+      return new Response(
+        JSON.stringify({
+          success: true,
+        }),
+        {
+          status: 200,
+          headers: createSecureHeaders(env, "application/json"),
+        },
+      );
     }
 
     // 未找到的 API 端点
-    return createErrorResponse('Not Found', 404, env);
-
+    return createErrorResponse("Not Found", 404, env);
   } catch (error) {
-    console.error('[ERROR] Admin API error:', error);
-    return createErrorResponse('Internal Server Error', 500, env);
+    console.error("[ERROR] Admin API error:", error);
+    return createErrorResponse("Internal Server Error", 500, env);
   }
 }
