@@ -1995,12 +1995,6 @@ export default {
     const path = url.pathname;
 
     //环境变量检查
-    if (!env.WECHAT_TEMPLATE_ID) {
-      return createErrorResponse(
-        "Server configuration error: Missing WECHAT_TEMPLATE_ID",
-        500,
-      );
-    }
 
     if (!env.CLIENT_AUTH_TOKEN) {
       return createErrorResponse(
