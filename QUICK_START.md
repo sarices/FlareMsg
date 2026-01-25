@@ -28,6 +28,18 @@ CLIENT_AUTH_TOKEN=test123456
 
 **获取微信测试号信息**：访问 https://mp.weixin.qq.com/debug/cgi-bin/sandbox?t=sandbox/login
 
+**关于 KV Namespace（可选配置）**：
+
+本项目使用 Cloudflare Workers KV 存储微信 Access Token 和用户 Token。本地开发时，KV 是可选的：
+- **首次测试**：可以跳过 KV 配置，直接启动开发服务器（Access Token 会在内存中缓存）
+- **完整功能**：如需测试 Token 持久化功能，创建本地 KV Namespace：
+  ```bash
+  npx wrangler kv namespace create WECHAT_KV --preview
+  ```
+  然后在 `wrangler.toml` 中添加 `preview_id` 字段。
+
+> 💡 **提示**：本地开发时，Access Token 会缓存在内存中，每次重启服务需要重新获取。生产环境部署时必须配置 KV。
+
 ### 3. 配置模版 ID（1 分钟）
 
 编辑 `wrangler.toml`，解除 `WECHAT_TEMPLATE_ID` 的注释并填入你的微信模版 ID：

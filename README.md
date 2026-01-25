@@ -45,11 +45,73 @@ npm install
 
 #### 3.1 创建 KV Namespace
 
+Cloudflare Workers KV 是一个全球分布的键值存储服务，用于存储微信 Access Token 和用户 Token 数据。
+
+**什么是 KV Namespace？**
+
+KV Namespace 是 Cloudflare Workers 提供的键值对存储空间，类似于 Redis，但具有全球低延迟访问的特点。在本项目中，KV 用于：
+- 缓存微信 Access Token（避免频繁调用微信 API）
+- 存储用户 Token（`sk_` 前缀的 token 与 openid 的映射关系）
+
+**创建生产环境 KV Namespace**：
+
 ```bash
 npx wrangler kv namespace create WECHAT_KV
 ```
 
-记录返回的 `id`，更新 `wrangler.toml` 中的 `YOUR_KV_NAMESPACE_ID`。
+执行后会返回类似以下内容：
+```
+🌀 Creating namespace with title "flaremsg-WETCHAT_KV"
+✨ Success!
+Add the following to your configuration file in your kv_namespaces array:
+{ binding = "WECHAT_KV", id = "xxxxxxxxxxxxxxxxxxxxxxxxxxxx" }
+```
+
+**理解 Worker 与 KV 的绑定关系**：
+
+在 `wrangler.toml` 中，KV Namespace 通过两个关键参数绑定到 Worker：
+
+```toml
+[[kv_namespaces]]
+binding = "WECHAT_KV"  # 绑定名称：在代码中通过这个名称访问 KV
+id = "xxxxxxxxxxxx"    # 命名空间 ID：Cloudflare 分配的唯一标识
+```
+
+- **binding（绑定名称）**：在代码中使用的变量名
+  - 例如在代码中：`env.WECHAT_KV.get("access_token")`
+  - 就像给 KV 存储空间起了一个"别名"，方便代码引用
+
+- **id（命名空间 ID）**：KV 在 Cloudflare 系统中的唯一标识
+  - 由 Cloudflare 自动生成
+  - 类似于数据库的连接字符串
+
+**配置方式**：
+
+**方式一：手动配置（用于本地开发）**
+
+1. 复制命令返回的 `id` 值
+2. 在 `wrangler.toml` 中解除 `id` 字段的注释：
+   ```toml
+   [[kv_namespaces]]
+   binding = "WECHAT_KV"
+   id = "xxxxxxxxxxxxxxxxxxxxxxxxxxxx"  # 替换为实际 ID
+   ```
+
+**方式二：GitHub Actions 自动配置（推荐用于生产环境）**
+
+保持 `id` 字段注释状态，在 GitHub Secrets 中添加：
+- `KV_NAMESPACE_ID`：运行 `npx wrangler kv namespace create WECHAT_KV` 返回的 ID
+
+GitHub Actions 会在部署前自动将 `wrangler.toml` 中的占位符替换为实际值。
+
+**验证 KV 绑定是否成功**：
+
+部署后，访问以下 URL 测试：
+```bash
+curl https://your-worker.workers.dev/
+```
+
+如果返回正常网页，说明 Worker 与 KV 绑定成功。
 
 #### 3.2 配置环境变量
 
