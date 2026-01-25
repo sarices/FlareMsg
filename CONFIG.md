@@ -30,7 +30,7 @@ cp .dev.vars.example .dev.vars
 ### Cloudflare 配置
 - `CLOUDFLARE_API_TOKEN`: Cloudflare API Token
 - `CLOUDFLARE_ACCOUNT_ID`: Cloudflare Account ID
-- `KV_NAMESPACE_ID`: KV Namespace ID（从 `wrangler kv:namespace create` 获取）
+- `KV_NAMESPACE_ID`: KV Namespace ID（从 `npx wrangler kv namespace create` 获取）
 - `WECHAT_TEMPLATE_ID`: 微信模板 ID
 
 ### 微信公众号配置（通过 wrangler secret）

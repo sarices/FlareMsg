@@ -22,7 +22,7 @@
 
 ```bash
 # 创建生产环境 KV Namespace
-npx wrangler kv:namespace create WECHAT_KV
+npx wrangler kv namespace create WECHAT_KV
 
 # 记录返回的 id，例如：
 # { id: "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" }
@@ -89,15 +89,15 @@ npx wrangler login
 
 ```bash
 # 生产环境
-npx wrangler kv:namespace create WECHAT_KV
+npx wrangler kv namespace create WECHAT_KV
 
 # 本地开发环境
-npx wrangler kv:namespace create WECHAT_KV --preview
+npx wrangler kv namespace create WECHAT_KV --preview
 ```
 
 #### 步骤 3：配置 wrangler.toml
 
-编辑 `src/wrangler.toml`，替换以下内容：
+编辑 `wrangler.toml`，替换以下内容：
 
 ```toml
 [[kv_namespaces]]
@@ -120,7 +120,6 @@ npx wrangler secret put CLIENT_AUTH_TOKEN
 #### 步骤 5：部署
 
 ```bash
-cd src
 npx wrangler deploy
 ```
 
@@ -249,7 +248,7 @@ npx wrangler kv key list --binding=WECHAT_KV --prefix="sk_"
    ```bash
    # 本地测试配置
    npx wrangler whoami
-   npx wrangler kv:namespace list
+   npx wrangler kv namespace list
    ```
 
 2. **查看日志**

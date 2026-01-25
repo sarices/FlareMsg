@@ -29,7 +29,6 @@
 ### 2. 安装依赖
 
 ```bash
-cd src
 npm install
 ```
 
@@ -38,24 +37,22 @@ npm install
 #### 3.1 创建 KV Namespace
 
 ```bash
-cd src
-wrangler kv:namespace create WECHAT_KV
+npx wrangler kv namespace create WECHAT_KV
 ```
 
-记录返回的 `id`，更新 `src/wrangler.toml` 中的 `YOUR_KV_NAMESPACE_ID`。
+记录返回的 `id`，更新 `wrangler.toml` 中的 `YOUR_KV_NAMESPACE_ID`。
 
 #### 3.2 配置环境变量
 
-编辑 `src/wrangler.toml`，填入：
+编辑 `wrangler.toml`，填入：
 
-- `WECHAT_TEMPLATE_ID`: 你的微信模版 ID
+- 解除 `WECHAT_TEMPLATE_ID` 注释并填入你的微信模版 ID
 - 其他可选配置（默认消息内容、颜色等）
 
 #### 3.3 设置敏感信息（Secrets）
 
 ```bash
-cd src
-wrangler secret put WECHAT_APP_ID
+npx wrangler secret put WECHAT_APP_ID
 # 输入你的微信 AppID
 
 wrangler secret put WECHAT_APP_SECRET
@@ -68,7 +65,6 @@ wrangler secret put CLIENT_AUTH_TOKEN
 ### 4. 本地开发
 
 ```bash
-cd src
 npm run dev
 ```
 
@@ -77,7 +73,6 @@ npm run dev
 ### 5. 部署到 Cloudflare
 
 ```bash
-cd src
 npm run deploy
 ```
 
@@ -448,8 +443,7 @@ HTTP 请求参数 > 环境变量默认值 > 代码内置默认值
 ### 查看日志
 
 ```bash
-cd src
-wrangler tail
+npx wrangler tail
 ```
 
 ## 项目文档

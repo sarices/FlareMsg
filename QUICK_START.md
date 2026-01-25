@@ -30,9 +30,10 @@ CLIENT_AUTH_TOKEN=test123456
 
 ### 3. 配置模版 ID（1 分钟）
 
-编辑 `wrangler.toml`，将 `YOUR_TEMPLATE_ID` 替换为你的微信模版 ID：
+编辑 `wrangler.toml`，解除 `WECHAT_TEMPLATE_ID` 的注释并填入你的微信模版 ID：
 
 ```toml
+# 将这一行的注释解除
 WECHAT_TEMPLATE_ID = "你的模版ID"
 ```
 
